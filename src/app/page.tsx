@@ -14,14 +14,19 @@ import { PesajeCamionesModule } from '@/components/pesaje-camiones-module'
 import { PesajeIndividualModule } from '@/components/pesaje-individual-module'
 import { MovimientoHaciendaModule } from '@/components/movimiento-hacienda-module'
 import { ListaFaenaModule } from '@/components/lista-faena'
+import { IngresoFaenaModule } from '@/components/ingreso-faena'
+import { CierreFaenaModule } from '@/components/cierre-faena'
 import { RomaneoModule } from '@/components/romaneo'
-import { MenudenciasModule } from '@/components/menudencias'
+import { MenudenciasTropaModule } from '@/components/menudencias-tropa'
+import { StockCamarasModule } from '@/components/stock-camaras'
+import { FacturacionModule } from '@/components/facturacion'
+import { ConnectionIndicator, OfflineBanner } from '@/lib/offline/components'
 
 // Lucide icons
 import { 
-  Truck, Beef, Scale, ClipboardList, TrendingUp, Package, Tag, Scissors, 
+  Truck, Beef, Scale, ClipboardList, ClipboardCheck, TrendingUp, Package, Tag, Scissors, 
   Warehouse, FileText, Settings, Calendar, LogOut, Lock, Users,
-  Loader2, Plus, Search, Weight, RefreshCw
+  Loader2, Plus, Search, Weight, RefreshCw, LogIn, DollarSign
 } from 'lucide-react'
 
 // Types
@@ -41,6 +46,7 @@ interface Operador {
     puedeStock: boolean
     puedeReportes: boolean
     puedeConfiguracion: boolean
+    puedeFacturacion: boolean
   }
 }
 
@@ -68,7 +74,7 @@ interface Stats {
   enCamara: number
 }
 
-type Page = 'dashboard' | 'pesajeCamiones' | 'movimientoHacienda' | 'pesajeIndividual' | 'listaFaena' | 'romaneo' | 'menudencias' | 'stock' | 'reportes' | 'configuracion'
+type Page = 'dashboard' | 'pesajeCamiones' | 'movimientoHacienda' | 'pesajeIndividual' | 'listaFaena' | 'ingresoFaena' | 'cierreFaena' | 'romaneo' | 'menudencias' | 'stock' | 'facturacion' | 'reportes' | 'configuracion'
 
 const NAV_ITEMS = [
   { id: 'dashboard' as Page, label: 'Dashboard', icon: Beef },
@@ -76,9 +82,12 @@ const NAV_ITEMS = [
   { id: 'pesajeIndividual' as Page, label: 'Pesaje Individual', icon: Scale, permiso: 'puedePesajeIndividual' },
   { id: 'movimientoHacienda' as Page, label: 'Movimiento Hacienda', icon: RefreshCw, permiso: 'puedeMovimientoHacienda' },
   { id: 'listaFaena' as Page, label: 'Lista de Faena', icon: ClipboardList, permiso: 'puedeListaFaena' },
+  { id: 'ingresoFaena' as Page, label: 'Ingreso a Faena', icon: LogIn, permiso: 'puedeListaFaena' },
+  { id: 'cierreFaena' as Page, label: 'Cierre de Faena', icon: ClipboardCheck, permiso: 'puedeListaFaena' },
   { id: 'romaneo' as Page, label: 'Romaneo', icon: TrendingUp, permiso: 'puedeRomaneo' },
-  { id: 'menudencias' as Page, label: 'Menudencias', icon: Package, permiso: 'puedeMenudencias' },
+  { id: 'menudencias' as Page, label: 'Menudencias por Tropa', icon: Package, permiso: 'puedeMenudencias' },
   { id: 'stock' as Page, label: 'Stock Cámaras', icon: Warehouse, permiso: 'puedeStock' },
+  { id: 'facturacion' as Page, label: 'Facturación', icon: DollarSign, permiso: 'puedeFacturacion' },
   { id: 'reportes' as Page, label: 'Reportes', icon: FileText, permiso: 'puedeReportes' },
   { id: 'configuracion' as Page, label: 'Configuración', icon: Settings, permiso: 'puedeConfiguracion' },
 ]
@@ -475,12 +484,18 @@ export default function FrigorificoApp() {
         return <MovimientoHaciendaModule operador={operador} />
       case 'listaFaena':
         return <ListaFaenaModule operador={operador} />
+      case 'ingresoFaena':
+        return <IngresoFaenaModule operador={operador} />
+      case 'cierreFaena':
+        return <CierreFaenaModule operador={operador} />
       case 'romaneo':
         return <RomaneoModule operador={operador} />
       case 'menudencias':
-        return <MenudenciasModule operador={operador} />
+        return <MenudenciasTropaModule operador={operador} />
       case 'stock':
-        return <PlaceholderContent title="Stock de Cámaras" description="Inventario de productos en cámaras" icon={Warehouse} />
+        return <StockCamarasModule operador={operador} />
+      case 'facturacion':
+        return <FacturacionModule operador={operador} />
       case 'reportes':
         return <PlaceholderContent title="Reportes" description="Informes y estadísticas" icon={FileText} />
       case 'configuracion':
@@ -491,12 +506,16 @@ export default function FrigorificoApp() {
   }
 
   return (
-    <div className="min-h-screen bg-stone-100 flex">
-      {/* Sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-40 w-64 bg-white border-r flex flex-col shadow-lg">
-        {/* Logo */}
-        <div className="h-20 flex items-center gap-3 px-4 border-b bg-gradient-to-r from-amber-50 to-white">
-          <div className="relative w-12 h-12 flex-shrink-0">
+    <div className="min-h-screen bg-stone-100 flex flex-col">
+      {/* Offline Banner */}
+      <OfflineBanner />
+      
+      <div className="flex flex-1">
+        {/* Sidebar */}
+        <aside className="fixed inset-y-0 left-0 z-40 w-64 bg-white border-r flex flex-col shadow-lg">
+          {/* Logo */}
+          <div className="h-20 flex items-center gap-3 px-4 border-b bg-gradient-to-r from-amber-50 to-white">
+            <div className="relative w-12 h-12 flex-shrink-0">
             <Image 
               src="/logo.png" 
               alt="Solemar Alimentaria" 
@@ -521,9 +540,12 @@ export default function FrigorificoApp() {
                 <p className="text-xs text-stone-400">{operador.rol}</p>
               </div>
             </div>
-            <Button variant="ghost" size="icon" onClick={handleLogout} className="h-8 w-8 text-stone-400 hover:text-red-500">
-              <LogOut className="w-4 h-4" />
-            </Button>
+            <div className="flex items-center gap-2">
+              <ConnectionIndicator />
+              <Button variant="ghost" size="icon" onClick={handleLogout} className="h-8 w-8 text-stone-400 hover:text-red-500">
+                <LogOut className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
         </div>
         
@@ -563,6 +585,7 @@ export default function FrigorificoApp() {
       <main className="ml-64 flex-1 min-h-screen">
         {renderPage()}
       </main>
+      </div>
     </div>
   )
 }

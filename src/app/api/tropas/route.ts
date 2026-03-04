@@ -86,7 +86,7 @@ export async function GET(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json()
-    const { id, estado, cantidadCabezas, corralId, pesoBruto, pesoTara, pesoNeto, pesoTotalIndividual, observaciones } = body
+    const { id, estado, cantidadCabezas, corralId, pesoBruto, pesoTara, pesoNeto, pesoTotalIndividual, observaciones, tiposAnimales } = body
 
     const updateData: Record<string, unknown> = {}
     
@@ -98,6 +98,27 @@ export async function PUT(request: NextRequest) {
     if (pesoNeto !== undefined) updateData.pesoNeto = parseFloat(pesoNeto) || null
     if (pesoTotalIndividual !== undefined) updateData.pesoTotalIndividual = parseFloat(pesoTotalIndividual) || null
     if (observaciones !== undefined) updateData.observaciones = observaciones
+
+    // Si se envían tiposAnimales, actualizarlos
+    if (tiposAnimales && Array.isArray(tiposAnimales)) {
+      // Primero eliminar los tipos existentes
+      await db.tropaAnimalCantidad.deleteMany({
+        where: { tropaId: id }
+      })
+      
+      // Luego crear los nuevos tipos
+      await db.tropaAnimalCantidad.createMany({
+        data: tiposAnimales.map((t: { tipoAnimal: string; cantidad: number }) => ({
+          tropaId: id,
+          tipoAnimal: t.tipoAnimal,
+          cantidad: t.cantidad
+        }))
+      })
+      
+      // Actualizar cantidadCabezas basándose en los tipos
+      const totalCabezas = tiposAnimales.reduce((acc: number, t: { cantidad: number }) => acc + t.cantidad, 0)
+      updateData.cantidadCabezas = totalCabezas
+    }
 
     const tropa = await db.tropa.update({
       where: { id },

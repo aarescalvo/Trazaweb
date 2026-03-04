@@ -166,6 +166,52 @@ export function ListaFaenaModule({ operador }: { operador: Operador }) {
     }
   }
 
+  const handleEditarCantidad = async (tropaId: string, nuevaCantidad: number) => {
+    if (!listaActual) return
+
+    try {
+      const res = await fetch('/api/lista-faena/tropas', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          listaFaenaId: listaActual.id,
+          tropaId,
+          cantidad: nuevaCantidad
+        })
+      })
+
+      const data = await res.json()
+      if (data.success) {
+        toast.success('Cantidad actualizada')
+        fetchData()
+      } else {
+        toast.error(data.error || 'Error al actualizar')
+      }
+    } catch (error) {
+      toast.error('Error de conexión')
+    }
+  }
+
+  const handleEliminarTropa = async (tropaId: string) => {
+    if (!listaActual) return
+
+    try {
+      const res = await fetch(`/api/lista-faena/tropas?listaFaenaId=${listaActual.id}&tropaId=${tropaId}`, {
+        method: 'DELETE'
+      })
+
+      const data = await res.json()
+      if (data.success) {
+        toast.success('Tropa eliminada de la lista')
+        fetchData()
+      } else {
+        toast.error(data.error || 'Error al eliminar')
+      }
+    } catch (error) {
+      toast.error('Error de conexión')
+    }
+  }
+
   const handleAsignarGarron = async () => {
     if (!listaActual || !garronInput) return
 
@@ -344,10 +390,40 @@ export function ListaFaenaModule({ operador }: { operador: Operador }) {
                       {listaActual.tropas && listaActual.tropas.length > 0 ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                           {listaActual.tropas.map((t, i) => (
-                            <div key={i} className="p-3 bg-stone-50 rounded-lg">
-                              <div className="flex items-center justify-between">
+                            <div key={i} className="p-3 bg-stone-50 rounded-lg border">
+                              <div className="flex items-center justify-between mb-2">
                                 <span className="font-mono font-bold">{t.tropa.codigo}</span>
-                                <Badge variant="outline">{t.cantidad} cab.</Badge>
+                                <div className="flex items-center gap-1">
+                                  {listaActual.estado === 'ABIERTA' && (
+                                    <>
+                                      <Input
+                                        type="number"
+                                        className="w-16 h-8 text-center"
+                                        min="1"
+                                        max={t.tropa.cantidadCabezas}
+                                        defaultValue={t.cantidad}
+                                        id={`edit-cant-${t.tropa.id}`}
+                                        onBlur={(e) => {
+                                          const nuevaCant = parseInt(e.target.value)
+                                          if (nuevaCant !== t.cantidad && nuevaCant > 0) {
+                                            handleEditarCantidad(t.tropa.id, nuevaCant)
+                                          }
+                                        }}
+                                      />
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-8 w-8 p-0 text-red-500 hover:text-red-700"
+                                        onClick={() => handleEliminarTropa(t.tropa.id)}
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </Button>
+                                    </>
+                                  )}
+                                  {listaActual.estado !== 'ABIERTA' && (
+                                    <Badge variant="outline">{t.cantidad} cab.</Badge>
+                                  )}
+                                </div>
                               </div>
                               <p className="text-sm text-stone-500 mt-1">{t.tropa.usuarioFaena?.nombre}</p>
                               <p className="text-xs text-stone-400">{typeof t.tropa.corral === 'object' ? t.tropa.corral?.nombre : t.tropa.corral || '-'}</p>

@@ -7,10 +7,11 @@ export async function GET(request: NextRequest) {
     // Get all tropas with corral assigned
     const tropas = await db.tropa.findMany({
       where: {
-        corral: { not: null },
+        corralId: { isNot: null },
         estado: { notIn: ['FAENADO', 'DESPACHADO'] }
       },
       include: {
+        corral: true,
         _count: {
           select: { animales: true }
         }
@@ -18,26 +19,32 @@ export async function GET(request: NextRequest) {
     })
 
     // Group by corral
-    const corralesMap = new Map<string, { totalCabezas: number; tropas: { codigo: string; cantidad: number }[] }>()
+    const corralesMap = new Map<string, { corralId: string; corralNombre: string; totalCabezas: number; tropas: { codigo: string; cantidad: number }[] }>()
 
     for (const tropa of tropas) {
-      if (!tropa.corral) continue
+      if (!tropa.corralId || !tropa.corral) continue
 
-      const corral = tropa.corral
-      const existing = corralesMap.get(corral) || { totalCabezas: 0, tropas: [] }
-      
+      const corralId = tropa.corralId
+      const existing = corralesMap.get(corralId) || {
+        corralId,
+        corralNombre: tropa.corral.nombre,
+        totalCabezas: 0,
+        tropas: []
+      }
+
       // Use animal count if available, otherwise use cantidadCabezas
       const cantidad = tropa._count.animales || tropa.cantidadCabezas
-      
+
       existing.totalCabezas += cantidad
       existing.tropas.push({ codigo: tropa.codigo, cantidad })
-      
-      corralesMap.set(corral, existing)
+
+      corralesMap.set(corralId, existing)
     }
 
     // Convert to array
-    const stock = Array.from(corralesMap.entries()).map(([corral, data]) => ({
-      corral,
+    const stock = Array.from(corralesMap.values()).map((data) => ({
+      corralId: data.corralId,
+      corralNombre: data.corralNombre,
       totalCabezas: data.totalCabezas,
       tropas: data.tropas
     }))

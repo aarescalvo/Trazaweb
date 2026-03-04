@@ -284,7 +284,36 @@ async function main() {
   })
   console.log(`   ✓ 6 corrales creados`)
 
-  // 5. Crear cámaras
+  // 5. Crear razas
+  console.log('🐎 Creando razas...')
+  const razasBovinas = [
+    'Angus', 'Hereford', 'Braford', 'Brangus', 'Charolais', 'Limousin',
+    'Santa Gertrudis', 'Nelore', 'Brahman', 'Cebú', 'Cruza', 'Otro'
+  ]
+  const razasEquinas = [
+    'Criollo', 'Pura Sangre', 'Cuarto de Milla', 'Percherón', 'Belga',
+    'Árabe', 'Silla Argentino', 'Petiso', 'Otro'
+  ]
+
+  for (const nombre of razasBovinas) {
+    await prisma.raza.upsert({
+      where: { nombre_especie: { nombre, especie: Especie.BOVINO } },
+      update: {},
+      create: { nombre, especie: Especie.BOVINO, activo: true }
+    })
+  }
+
+  for (const nombre of razasEquinas) {
+    await prisma.raza.upsert({
+      where: { nombre_especie: { nombre, especie: Especie.EQUINO } },
+      update: {},
+      create: { nombre, especie: Especie.EQUINO, activo: true }
+    })
+  }
+  console.log(`   ✓ ${razasBovinas.length} razas bovinas creadas`)
+  console.log(`   ✓ ${razasEquinas.length} razas equinas creadas`)
+
+  // 6. Crear cámaras
   console.log('❄️ Creando cámaras...')
   await prisma.camara.upsert({
     where: { nombre: 'Cámara Faena 1' },

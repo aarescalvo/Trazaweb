@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { 
   TrendingUp, Scale, Printer, Save, Eye, CheckCircle, 
-  Beef, Award, Mail, Lock, RefreshCw, AlertTriangle
+  Beef, Award, Mail, Lock, RefreshCw, AlertTriangle, FileDown, FileText
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -56,6 +56,17 @@ interface Operador {
   nivel: string
 }
 
+interface Tropa {
+  id: string
+  codigo: string
+  numero: number
+  usuarioFaena?: {
+    nombre: string
+  }
+  cantidadCabezas: number
+  estado: string
+}
+
 export function RomaneoModule({ operador }: { operador: Operador }) {
   const [romaneos, setRomaneos] = useState<RomaneoItem[]>([])
   const [tipificadores, setTipificadores] = useState<Tipificador[]>([])
@@ -76,6 +87,11 @@ export function RomaneoModule({ operador }: { operador: Operador }) {
   const [confirmarOpen, setConfirmarOpen] = useState(false)
   const [claveSupervisor, setClaveSupervisor] = useState('')
   const [detalleOpen, setDetalleOpen] = useState(false)
+  
+  // Reportes
+  const [tropas, setTropas] = useState<Tropa[]>([])
+  const [tropaSeleccionada, setTropaSeleccionada] = useState('')
+  const [generandoPDF, setGenerandoPDF] = useState(false)
 
   useEffect(() => {
     fetchData()
@@ -83,13 +99,15 @@ export function RomaneoModule({ operador }: { operador: Operador }) {
 
   const fetchData = async () => {
     try {
-      const [romaneosRes, tipificadoresRes] = await Promise.all([
+      const [romaneosRes, tipificadoresRes, tropasRes] = await Promise.all([
         fetch('/api/romaneo'),
-        fetch('/api/tipificadores')
+        fetch('/api/tipificadores'),
+        fetch('/api/tropas')
       ])
       
       const romaneosData = await romaneosRes.json()
       const tipificadoresData = await tipificadoresRes.json()
+      const tropasData = await tropasRes.json()
       
       if (romaneosData.success) {
         setRomaneos(romaneosData.data)
@@ -97,6 +115,13 @@ export function RomaneoModule({ operador }: { operador: Operador }) {
       
       if (tipificadoresData.success) {
         setTipificadores(tipificadoresData.data.filter((t: Tipificador) => t.activo))
+      }
+      
+      if (tropasData.success) {
+        // Filtrar tropas con animales faenados o en proceso
+        setTropas(tropasData.data.filter((t: Tropa) => 
+          t.estado === 'EN_FAENA' || t.estado === 'FAENADO' || t.estado === 'PESADO'
+        ))
       }
     } catch (error) {
       console.error('Error fetching data:', error)
@@ -224,6 +249,42 @@ export function RomaneoModule({ operador }: { operador: Operador }) {
     }
   }
 
+  const handleGenerarPDF = async () => {
+    if (!tropaSeleccionada) {
+      toast.error('Seleccione una tropa')
+      return
+    }
+
+    setGenerandoPDF(true)
+    try {
+      const response = await fetch(`/api/reportes/romaneo?tropaCodigo=${encodeURIComponent(tropaSeleccionada)}`)
+      
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Error al generar PDF')
+      }
+
+      // Obtener el blob del PDF
+      const blob = await response.blob()
+      
+      // Crear URL y descargar
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `romaneo-${tropaSeleccionada.replace(/\s+/g, '-')}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+      
+      toast.success('PDF generado correctamente')
+    } catch (error: any) {
+      toast.error(error.message || 'Error al generar PDF')
+    } finally {
+      setGenerandoPDF(false)
+    }
+  }
+
   const handleConfirmarRomaneo = async () => {
     if (!claveSupervisor) {
       toast.error('Ingrese la clave de supervisor')
@@ -306,10 +367,11 @@ export function RomaneoModule({ operador }: { operador: Operador }) {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="pesar">Pesar Medias</TabsTrigger>
             <TabsTrigger value="pendientes">Pendientes</TabsTrigger>
             <TabsTrigger value="historial">Historial</TabsTrigger>
+            <TabsTrigger value="reportes">Reportes</TabsTrigger>
           </TabsList>
 
           {/* PESAR MEDIAS */}
@@ -564,6 +626,111 @@ export function RomaneoModule({ operador }: { operador: Operador }) {
                     </TableBody>
                   </Table>
                 )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* REPORTES */}
+          <TabsContent value="reportes" className="space-y-6">
+            <Card className="border-0 shadow-md">
+              <CardHeader className="bg-blue-50 rounded-t-lg">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <FileText className="w-5 h-5" />
+                  Generar Reporte de Romaneo
+                </CardTitle>
+                <CardDescription>
+                  Genere el reporte PDF del Romaneo por Tropa con todos los datos de faena
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="max-w-xl mx-auto space-y-6">
+                  {/* Selector de tropa */}
+                  <div className="space-y-2">
+                    <Label className="text-base">Seleccionar Tropa</Label>
+                    <Select value={tropaSeleccionada} onValueChange={setTropaSeleccionada}>
+                      <SelectTrigger className="h-12">
+                        <SelectValue placeholder="Seleccione una tropa para generar el reporte..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {tropas.length === 0 ? (
+                          <div className="p-4 text-center text-stone-400">
+                            No hay tropas con romaneos disponibles
+                          </div>
+                        ) : (
+                          tropas.map((t) => (
+                            <SelectItem key={t.id} value={t.codigo}>
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono font-bold">{t.codigo}</span>
+                                <span className="text-stone-400">-</span>
+                                <span>{t.usuarioFaena?.nombre || 'Sin usuario'}</span>
+                                <span className="text-stone-400">-</span>
+                                <span>{t.cantidadCabezas} animales</span>
+                              </div>
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Vista previa de tropa seleccionada */}
+                  {tropaSeleccionada && (
+                    <div className="p-4 bg-stone-50 rounded-lg border">
+                      <h4 className="font-medium mb-3">Tropa seleccionada:</h4>
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <span className="text-stone-500">Código:</span>
+                          <p className="font-mono font-bold">{tropaSeleccionada}</p>
+                        </div>
+                        <div>
+                          <span className="text-stone-500">Usuario:</span>
+                          <p>{tropas.find(t => t.codigo === tropaSeleccionada)?.usuarioFaena?.nombre || '-'}</p>
+                        </div>
+                        <div>
+                          <span className="text-stone-500">Animales:</span>
+                          <p>{tropas.find(t => t.codigo === tropaSeleccionada)?.cantidadCabezas || 0}</p>
+                        </div>
+                        <div>
+                          <span className="text-stone-500">Estado:</span>
+                          <Badge variant="outline">
+                            {tropas.find(t => t.codigo === tropaSeleccionada)?.estado || '-'}
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Botón generar */}
+                  <Button
+                    onClick={handleGenerarPDF}
+                    disabled={!tropaSeleccionada || generandoPDF}
+                    className="w-full h-14 bg-blue-600 hover:bg-blue-700"
+                  >
+                    {generandoPDF ? (
+                      <>
+                        <RefreshCw className="w-5 h-5 mr-2 animate-spin" />
+                        Generando PDF...
+                      </>
+                    ) : (
+                      <>
+                        <FileDown className="w-5 h-5 mr-2" />
+                        Generar Romaneo PDF
+                      </>
+                    )}
+                  </Button>
+
+                  {/* Información adicional */}
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <h5 className="font-medium text-blue-800 mb-2">El reporte incluye:</h5>
+                    <ul className="text-sm text-blue-700 space-y-1">
+                      <li>• Datos del frigorífico y matrícula</li>
+                      <li>• Información de la tropa (usuario, productor, DTE, guía)</li>
+                      <li>• Resumen por tipo de animal (VQ, NT, NO, TO, VA, MEJ)</li>
+                      <li>• Detalle de cada animal con pesos y rinde</li>
+                      <li>• Totales calculados automáticamente</li>
+                    </ul>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>

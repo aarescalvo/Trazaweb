@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Users, Plus, Edit, Trash2, Save, X, AlertTriangle, Phone, MapPin, Mail, UserCheck, Beef } from 'lucide-react'
+import { Users, Plus, Edit, Trash2, Save, X, AlertTriangle, Phone, MapPin, Mail, UserCheck, Beef, Upload, FileSpreadsheet } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toast } from 'sonner'
+import { ScrollArea } from '@/components/ui/scroll-area'
 
 interface ClienteItem {
   id: string
@@ -38,6 +39,17 @@ export function Clientes({ operador }: { operador: Operador }) {
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [editando, setEditando] = useState<ClienteItem | null>(null)
   const [activeTab, setActiveTab] = useState('todos')
+  
+  // Estados para migración
+  const [migracionOpen, setMigracionOpen] = useState(false)
+  const [migrando, setMigrando] = useState(false)
+  const [resultadoMigracion, setResultadoMigracion] = useState<{
+    total: number
+    creados: number
+    duplicados: number
+    errores: string[]
+    usuariosCreados: Array<{ nombre: string; cuit: string }>
+  } | null>(null)
   
   const [formData, setFormData] = useState({
     nombre: '',
@@ -162,6 +174,31 @@ export function Clientes({ operador }: { operador: Operador }) {
     }
   }
 
+  const handleMigrar = async () => {
+    setMigrando(true)
+    setResultadoMigracion(null)
+    
+    try {
+      const res = await fetch('/api/migrar-usuarios', {
+        method: 'POST'
+      })
+      
+      const data = await res.json()
+      
+      if (data.success) {
+        setResultadoMigracion(data.data)
+        toast.success(`Migración completada: ${data.data.creados} usuarios creados`)
+        fetchClientes()
+      } else {
+        toast.error(data.error || 'Error en la migración')
+      }
+    } catch (error) {
+      toast.error('Error de conexión')
+    } finally {
+      setMigrando(false)
+    }
+  }
+
   const clientesFiltrados = clientes.filter(c => {
     if (activeTab === 'todos') return true
     if (activeTab === 'productores') return c.esProductor
@@ -183,10 +220,23 @@ export function Clientes({ operador }: { operador: Operador }) {
                 Proveedores de hacienda y usuarios del servicio de faena
               </CardDescription>
             </div>
-            <Button onClick={() => handleNuevo()} className="bg-amber-500 hover:bg-amber-600">
-              <Plus className="w-4 h-4 mr-2" />
-              Nuevo Cliente
-            </Button>
+            <div className="flex gap-2">
+              <Button 
+                onClick={() => {
+                  setResultadoMigracion(null)
+                  setMigracionOpen(true)
+                }} 
+                variant="outline"
+                className="border-blue-500 text-blue-600 hover:bg-blue-50"
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                Importar Usuarios
+              </Button>
+              <Button onClick={() => handleNuevo()} className="bg-amber-500 hover:bg-amber-600">
+                <Plus className="w-4 h-4 mr-2" />
+                Nuevo Cliente
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="p-0">
@@ -401,6 +451,120 @@ export function Clientes({ operador }: { operador: Operador }) {
             <Button onClick={handleConfirmarEliminar} disabled={saving} className="bg-red-600 hover:bg-red-700">
               {saving ? 'Eliminando...' : 'Eliminar'}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Migración */}
+      <Dialog open={migracionOpen} onOpenChange={setMigracionOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileSpreadsheet className="w-5 h-5 text-blue-600" />
+              Importar Usuarios de Faena
+            </DialogTitle>
+            <DialogDescription>
+              Importa los usuarios desde el archivo Excel &quot;CUIT DE USUARIOS + DATOS.xlsx&quot;
+            </DialogDescription>
+          </DialogHeader>
+          
+          {!resultadoMigracion ? (
+            <div className="space-y-4 py-4">
+              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                <h4 className="font-medium text-blue-800 mb-2">Se importarán los siguientes datos:</h4>
+                <ul className="text-sm text-blue-700 space-y-1">
+                  <li>• Nombre/Razón Social (TITULAR)</li>
+                  <li>• CUIT</li>
+                  <li>• Emails (pueden ser múltiples)</li>
+                  <li>• Nombre de contacto</li>
+                  <li>• Celular</li>
+                </ul>
+              </div>
+              
+              <div className="bg-amber-50 p-4 rounded-lg border border-amber-200">
+                <h4 className="font-medium text-amber-800 mb-1">⚠️ Importante:</h4>
+                <p className="text-sm text-amber-700">
+                  Los usuarios con CUIT duplicado serán omitidos automáticamente.
+                  Todos los usuarios importados se marcarán como &quot;Usuario de Faena&quot; con modalidad &quot;Retiro en planta&quot;.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4 py-4">
+              <div className="grid grid-cols-3 gap-4 text-center">
+                <div className="bg-stone-100 p-4 rounded-lg">
+                  <div className="text-2xl font-bold text-stone-700">{resultadoMigracion.total}</div>
+                  <div className="text-xs text-stone-500">Total en Excel</div>
+                </div>
+                <div className="bg-green-100 p-4 rounded-lg">
+                  <div className="text-2xl font-bold text-green-700">{resultadoMigracion.creados}</div>
+                  <div className="text-xs text-green-500">Creados</div>
+                </div>
+                <div className="bg-amber-100 p-4 rounded-lg">
+                  <div className="text-2xl font-bold text-amber-700">{resultadoMigracion.duplicados}</div>
+                  <div className="text-xs text-amber-500">Duplicados</div>
+                </div>
+              </div>
+
+              {resultadoMigracion.usuariosCreados.length > 0 && (
+                <div className="border rounded-lg overflow-hidden">
+                  <div className="bg-stone-50 px-3 py-2 border-b">
+                    <h4 className="font-medium text-sm">Usuarios creados:</h4>
+                  </div>
+                  <ScrollArea className="h-40">
+                    <div className="divide-y">
+                      {resultadoMigracion.usuariosCreados.map((u, i) => (
+                        <div key={i} className="px-3 py-2 text-sm flex justify-between">
+                          <span>{u.nombre}</span>
+                          <span className="font-mono text-stone-500">{u.cuit}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </div>
+              )}
+
+              {resultadoMigracion.errores.length > 0 && (
+                <div className="border border-red-200 rounded-lg overflow-hidden">
+                  <div className="bg-red-50 px-3 py-2 border-b border-red-200">
+                    <h4 className="font-medium text-sm text-red-700">Errores ({resultadoMigracion.errores.length})</h4>
+                  </div>
+                  <ScrollArea className="h-24">
+                    <div className="divide-y divide-red-100">
+                      {resultadoMigracion.errores.map((e, i) => (
+                        <div key={i} className="px-3 py-2 text-sm text-red-600">
+                          {e}
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </div>
+              )}
+            </div>
+          )}
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMigracionOpen(false)}>
+              {resultadoMigracion ? 'Cerrar' : 'Cancelar'}
+            </Button>
+            {!resultadoMigracion && (
+              <Button 
+                onClick={handleMigrar} 
+                disabled={migrando} 
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                {migrando ? (
+                  <>
+                    <span className="animate-pulse">Importando...</span>
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-4 h-4 mr-2" />
+                    Iniciar Importación
+                  </>
+                )}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -66,6 +66,9 @@ export function PesajeCamionesModule({ operador, onTropaCreada }: { operador: Op
   const [nextTicket, setNextTicket] = useState(1)
   const [saving, setSaving] = useState(false)
   
+  // Configuración del frigorífico
+  const [config, setConfig] = useState<{ nombre?: string; direccion?: string; logo?: string }>({})
+  
   const [activeTab, setActiveTab] = useState('nuevo')
   const [tipoPesaje, setTipoPesaje] = useState('INGRESO_HACIENDA')
   
@@ -149,17 +152,19 @@ export function PesajeCamionesModule({ operador, onTropaCreada }: { operador: Op
 
   const fetchData = async () => {
     try {
-      const [pesajesRes, transRes, clientesRes, corralesRes] = await Promise.all([
+      const [pesajesRes, transRes, clientesRes, corralesRes, configRes] = await Promise.all([
         fetch('/api/pesaje-camion'),
         fetch('/api/transportistas'),
         fetch('/api/clientes'),
-        fetch('/api/corrales')
+        fetch('/api/corrales'),
+        fetch('/api/configuracion')
       ])
       
       const pesajesData = await pesajesRes.json()
       const transData = await transRes.json()
       const clientesData = await clientesRes.json()
       const corralesData = await corralesRes.json()
+      const configData = await configRes.json()
       
       if (pesajesData.success) {
         setPesajesAbiertos(pesajesData.data.filter((p: any) => p.estado === 'ABIERTO'))
@@ -177,6 +182,14 @@ export function PesajeCamionesModule({ operador, onTropaCreada }: { operador: Op
       
       if (corralesData.success) {
         setCorrales(corralesData.data)
+      }
+      
+      if (configData.success) {
+        setConfig({
+          nombre: configData.data.nombre,
+          direccion: configData.data.direccion,
+          logo: configData.data.logo
+        })
       }
     } catch (error) {
       console.error('Error fetching data:', error)
@@ -419,7 +432,7 @@ export function PesajeCamionesModule({ operador, onTropaCreada }: { operador: Op
         
         // Print ticket after state updates
         setTimeout(() => {
-          imprimirTicket(data.data, true)
+          imprimirTicket(data.data, true, config)
         }, 100)
         
         // Refresh data
@@ -501,7 +514,7 @@ export function PesajeCamionesModule({ operador, onTropaCreada }: { operador: Op
 
   // Imprimir reporte por rango de fechas
   const handleImprimirReporte = () => {
-    imprimirReporte(pesajesFiltrados, fechaDesde, fechaHasta)
+    imprimirReporte(pesajesFiltrados, fechaDesde, fechaHasta, config)
   }
 
   return (

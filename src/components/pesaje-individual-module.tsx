@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { 
   Scale, RefreshCw, Printer, Eye, Plus, Save, CheckCircle, AlertCircle,
-  Beef, Edit, Trash2, ArrowRight, X
+  Beef, Edit, Trash2, ArrowRight, X, FileText, Minus, FileDown
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -120,6 +120,12 @@ export function PesajeIndividualModule({ tropas: propTropas, operador }: { tropa
   const [editRaza, setEditRaza] = useState('')
   const [editPeso, setEditPeso] = useState('')
 
+  // DTE - Confirmación de tipos
+  const [confirmarTiposOpen, setConfirmarTiposOpen] = useState(false)
+  const [tiposConfirmados, setTiposConfirmados] = useState<{ tipoAnimal: string; cantidad: number; esDeclarado: boolean }[]>([])
+  const [nuevoTipo, setNuevoTipo] = useState('')
+  const [nuevaCantidad, setNuevaCantidad] = useState(1)
+
   useEffect(() => {
     if (!propTropas) {
       fetchData()
@@ -186,6 +192,100 @@ export function PesajeIndividualModule({ tropas: propTropas, operador }: { tropa
     
     setTropaSeleccionada(tropa)
     resetFormFields()
+    
+    // Abrir diálogo de confirmación de tipos DTE
+    // Inicializar con los tipos declarados (esDeclarado = true)
+    const tiposDeclarados = (tropa.tiposAnimales || []).map(t => ({
+      tipoAnimal: t.tipoAnimal,
+      cantidad: t.cantidad,
+      esDeclarado: true
+    }))
+    setTiposConfirmados(tiposDeclarados)
+    setConfirmarTiposOpen(true)
+  }
+
+  // Agregar tipo no declarado en el DTE
+  const handleAgregarTipo = () => {
+    if (!nuevoTipo) {
+      toast.error('Seleccione un tipo de animal')
+      return
+    }
+    if (nuevaCantidad <= 0) {
+      toast.error('La cantidad debe ser mayor a 0')
+      return
+    }
+    // Verificar que no exista ya
+    if (tiposConfirmados.some(t => t.tipoAnimal === nuevoTipo)) {
+      toast.error('Este tipo ya está en la lista')
+      return
+    }
+    setTiposConfirmados([...tiposConfirmados, {
+      tipoAnimal: nuevoTipo,
+      cantidad: nuevaCantidad,
+      esDeclarado: false // No estaba en el DTE original
+    }])
+    setNuevoTipo('')
+    setNuevaCantidad(1)
+    toast.success('Tipo agregado correctamente')
+  }
+
+  // Modificar cantidad de un tipo
+  const handleModificarCantidad = (tipoAnimal: string, cantidad: number) => {
+    setTiposConfirmados(tiposConfirmados.map(t => 
+      t.tipoAnimal === tipoAnimal ? { ...t, cantidad } : t
+    ))
+  }
+
+  // Eliminar tipo (solo los no declarados)
+  const handleEliminarTipo = (tipoAnimal: string) => {
+    setTiposConfirmados(tiposConfirmados.filter(t => t.tipoAnimal !== tipoAnimal))
+  }
+
+  // Confirmar tipos y cerrar diálogo
+  const handleConfirmarTipos = async () => {
+    if (tiposConfirmados.length === 0) {
+      toast.error('Debe confirmar al menos un tipo de animal')
+      return
+    }
+    
+    // Guardar los tipos confirmados en la tropa
+    try {
+      const res = await fetch('/api/tropas', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: tropaSeleccionada?.id,
+          tiposAnimales: tiposConfirmados.map(t => ({
+            tipoAnimal: t.tipoAnimal,
+            cantidad: t.cantidad
+          }))
+        })
+      })
+      
+      const responseData = await res.json()
+      
+      if (!res.ok || !responseData.success) {
+        toast.error(responseData.error || 'Error al actualizar tipos')
+        return
+      }
+      
+      // Actualizar la tropa seleccionada con los nuevos tipos
+      if (tropaSeleccionada) {
+        setTropaSeleccionada({
+          ...tropaSeleccionada,
+          tiposAnimales: tiposConfirmados.map(t => ({
+            tipoAnimal: t.tipoAnimal,
+            cantidad: t.cantidad
+          })),
+          cantidadCabezas: tiposConfirmados.reduce((acc, t) => acc + t.cantidad, 0)
+        })
+      }
+      
+      setConfirmarTiposOpen(false)
+      toast.success('Tipos confirmados correctamente')
+    } catch (error) {
+      toast.error('Error de conexión')
+    }
   }
 
   const resetFormFields = () => {
@@ -200,6 +300,12 @@ export function PesajeIndividualModule({ tropas: propTropas, operador }: { tropa
     if (!tropaSeleccionada) return
     if (!corralDestinoId) {
       toast.error('Seleccione el corral de destino')
+      return
+    }
+    
+    // Verificar que se hayan confirmado los tipos
+    if (tiposConfirmados.length === 0) {
+      toast.error('Debe confirmar los tipos de animales antes de iniciar el pesaje')
       return
     }
     
@@ -220,14 +326,15 @@ export function PesajeIndividualModule({ tropas: propTropas, operador }: { tropa
         toast.success('Pesaje iniciado')
         setActiveTab('pesar')
         
-        // Create animals list based on tiposAnimales
+        // Create animals list based on tiposConfirmados (not just tiposAnimales)
         if (animales.length === 0) {
           const nuevosAnimales: Animal[] = []
           let num = 1
           const prefijo = tropaSeleccionada.especie === 'BOVINO' ? 'B' : 'E'
           const year = new Date().getFullYear()
           
-          for (const tipo of tropaSeleccionada.tiposAnimales || []) {
+          // Usar tiposConfirmados en lugar de tropa.tiposAnimales
+          for (const tipo of tiposConfirmados) {
             for (let i = 0; i < tipo.cantidad; i++) {
               nuevosAnimales.push({
                 id: `temp-${num}`,
@@ -381,7 +488,30 @@ export function PesajeIndividualModule({ tropas: propTropas, operador }: { tropa
   }
 
   const imprimirRotulo = (animal: Animal) => {
-    // Rótulo simplificado con SOLO 4 datos clave
+    // Generar código EAN-128 ÚNICO para animal en pie
+    // Estructura según GS1-128:
+    // (01) GTIN - Identificación global del artículo (14 dígitos)
+    // (10) Número de lote - Código de tropa (incluye especie + año + número)
+    // (21) Número de serie - Número de animal dentro de la tropa
+    // (3102) Peso neto en kg - Peso en decigramos (6 dígitos)
+
+    // Código de tropa completo: B20260001 (especie + año + número) o E20260001 para equinos
+    const codigoTropa = tropaSeleccionada?.codigo || '' // Ej: B20260001
+
+    // Número de animal dentro de la tropa (4 dígitos)
+    const numAnimal = (animal.numero || 1).toString().padStart(4, '0')
+
+    // Peso en decigramos (6 dígitos) - EAN-128 requiere peso en decigramos para AI(3102)
+    // 450.5 kg = 4505 decigramos = 004505
+    const pesoKg = Math.round((animal.pesoVivo || 0) * 10).toString().padStart(6, '0')
+
+    // Código EAN-128 ÚNICO: 01 + GTIN + 10 + Tropa + 21 + Animal + 3102 + Peso
+    // Este código es único e irrepetible porque combina:
+    // - Código de tropa (especie + año + número secuencial)
+    // - Número de animal único dentro de la tropa
+    // - Peso individual
+    const codigoEAN128 = `0178912345678910${codigoTropa}21${numAnimal}3102${pesoKg}`
+
     const printWindow = window.open('', '_blank', 'width=300,height=400')
     if (printWindow) {
       printWindow.document.write(`
@@ -391,9 +521,9 @@ export function PesajeIndividualModule({ tropas: propTropas, operador }: { tropa
           <title>Rótulo ${animal.codigo}</title>
           <style>
             @page { size: 10cm 10cm; margin: 0; }
-            body { 
-              font-family: Arial, sans-serif; 
-              padding: 5mm; 
+            body {
+              font-family: Arial, sans-serif;
+              padding: 5mm;
               width: 10cm;
               height: 10cm;
               box-sizing: border-box;
@@ -425,9 +555,9 @@ export function PesajeIndividualModule({ tropas: propTropas, operador }: { tropa
             }
             .label { font-weight: bold; font-size: 14px; }
             .valor { font-size: 18px; font-weight: bold; }
-            .peso-destacado { 
-              font-size: 32px; 
-              font-weight: bold; 
+            .peso-destacado {
+              font-size: 32px;
+              font-weight: bold;
               text-align: center;
               margin: 4mm 0;
               padding: 4mm;
@@ -435,49 +565,64 @@ export function PesajeIndividualModule({ tropas: propTropas, operador }: { tropa
               color: #fff;
               border-radius: 5px;
             }
-            .barcode {
+            .barcode-container {
               text-align: center;
               margin-top: auto;
-              font-family: 'Libre Barcode 39', cursive;
-              font-size: 28px;
+              padding-top: 3mm;
+            }
+            .barcode {
+              font-family: 'Libre Barcode 128 Text', 'Code 128', monospace;
+              font-size: 40px;
+              letter-spacing: 2px;
+            }
+            .barcode-text {
+              font-size: 10px;
+              font-family: monospace;
+              margin-top: 2mm;
             }
           </style>
+          <!-- Incluir fuente Code 128 -->
+          <link href="https://fonts.googleapis.com/css2?family=Libre+Barcode+128+Text&display=swap" rel="stylesheet">
         </head>
         <body>
           <div class="rotulo">
             <div class="header">
               <div class="empresa">SOLEMAR ALIMENTARIA</div>
             </div>
-            
-            <!-- 4 DATOS CLAVE -->
+
+            <!-- DATOS CLAVE - SIN FECHA -->
             <div class="dato">
               <span class="label">TROPA:</span>
               <span class="valor">${tropaSeleccionada?.codigo || ''}</span>
             </div>
-            
+
             <div class="dato">
               <span class="label">ANIMAL Nº:</span>
               <span class="valor">${animal.numero}</span>
             </div>
-            
+
             <div class="dato">
-              <span class="label">FECHA:</span>
-              <span class="valor">${new Date().toLocaleDateString('es-AR')}</span>
+              <span class="label">TIPO:</span>
+              <span class="valor">${animal.tipoAnimal || '-'}</span>
             </div>
-            
+
             <div class="peso-destacado">
               ${animal.pesoVivo?.toLocaleString()} KG
             </div>
-            
-            <div class="barcode">
-              *${animal.codigo}*
+
+            <!-- CÓDIGO EAN-128 -->
+            <div class="barcode-container">
+              <div class="barcode">${codigoEAN128}</div>
+              <div class="barcode-text">${codigoEAN128}</div>
             </div>
           </div>
-          
+
           <script>
-            window.onload = function() { 
-              window.print(); 
-              window.onafterprint = function() { window.close(); } 
+            window.onload = function() {
+              setTimeout(function() {
+                window.print();
+                window.onafterprint = function() { window.close(); }
+              }, 500);
             }
           </script>
         </body>
@@ -569,6 +714,38 @@ export function PesajeIndividualModule({ tropas: propTropas, operador }: { tropa
   const handleReprint = (animal: Animal) => {
     imprimirRotulo(animal)
     toast.success('Rótulo enviado a impresión')
+  }
+
+  // Generar Planilla 01 PDF
+  const handleGenerarPlanilla01 = async (tropaId: string, tropaCodigo: string) => {
+    try {
+      toast.info('Generando Planilla 01...')
+      
+      // Llamar a la API para generar el PDF
+      const response = await fetch(`/api/reportes/planilla-01?tropaId=${tropaId}`)
+      
+      if (!response.ok) {
+        const error = await response.json()
+        toast.error(error.error || 'Error al generar el PDF')
+        return
+      }
+      
+      // Descargar el PDF
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `Planilla_01_${tropaCodigo}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+      
+      toast.success('Planilla 01 descargada correctamente')
+    } catch (error) {
+      console.error('Error generando Planilla 01:', error)
+      toast.error('Error al generar la Planilla 01')
+    }
   }
 
   const animalesPendientes = animales.filter(a => a.estado === 'RECIBIDO')
@@ -1026,6 +1203,7 @@ export function PesajeIndividualModule({ tropas: propTropas, operador }: { tropa
                         <TableHead>Cabezas</TableHead>
                         <TableHead>Peso Total</TableHead>
                         <TableHead>Peso Promedio</TableHead>
+                        <TableHead>Acciones</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1042,6 +1220,17 @@ export function PesajeIndividualModule({ tropas: propTropas, operador }: { tropa
                             {tropa.pesoTotalIndividual 
                               ? Math.round(tropa.pesoTotalIndividual / tropa.cantidadCabezas).toLocaleString() 
                               : '-'} kg/cab
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleGenerarPlanilla01(tropa.id, tropa.codigo)}
+                              className="gap-1"
+                            >
+                              <FileDown className="w-4 h-4" />
+                              Planilla 01
+                            </Button>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -1147,6 +1336,183 @@ export function PesajeIndividualModule({ tropas: propTropas, operador }: { tropa
             <Button variant="outline" onClick={() => setShowRotuloPreview(false)}>Cerrar</Button>
             <Button onClick={() => { if (rotuloPreviewData) imprimirRotulo(rotuloPreviewData); setShowRotuloPreview(false); }} className="bg-amber-500 hover:bg-amber-600">
               <Printer className="w-4 h-4 mr-2" /> Imprimir
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* DTE - Confirmación de Tipos Dialog */}
+      <Dialog open={confirmarTiposOpen} onOpenChange={setConfirmarTiposOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="w-5 h-5 text-amber-500" />
+              Confirmar Tipos de Animales - DTE
+            </DialogTitle>
+            <DialogDescription>
+              Tropa: {tropaSeleccionada?.codigo} | Revise y confirme los tipos declarados. Puede agregar tipos no declarados.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            {/* Tipos declarados en el DTE */}
+            <div className="space-y-2">
+              <Label className="text-base font-semibold flex items-center gap-2">
+                Tipos Declarados en DTE
+                <Badge variant="outline" className="text-xs">Original</Badge>
+              </Label>
+              <div className="border rounded-lg p-3 space-y-2 bg-stone-50">
+                {tiposConfirmados.filter(t => t.esDeclarado).length === 0 ? (
+                  <p className="text-stone-400 text-sm">No hay tipos declarados en el DTE</p>
+                ) : (
+                  tiposConfirmados.filter(t => t.esDeclarado).map((tipo) => (
+                    <div key={tipo.tipoAnimal} className="flex items-center justify-between bg-white p-2 rounded border">
+                      <div className="flex items-center gap-3">
+                        <Badge className="bg-amber-100 text-amber-700">{tipo.tipoAnimal}</Badge>
+                        <span className="text-sm text-stone-500">
+                          {TIPOS_ANIMALES[tropaSeleccionada?.especie || 'BOVINO']?.find(t => t.codigo === tipo.tipoAnimal)?.label || tipo.tipoAnimal}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => handleModificarCantidad(tipo.tipoAnimal, Math.max(0, tipo.cantidad - 1))}
+                          disabled={tipo.cantidad <= 1}
+                        >
+                          <Minus className="w-4 h-4" />
+                        </Button>
+                        <Input 
+                          type="number" 
+                          className="w-16 text-center" 
+                          value={tipo.cantidad}
+                          onChange={(e) => handleModificarCantidad(tipo.tipoAnimal, parseInt(e.target.value) || 0)}
+                          min={0}
+                        />
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => handleModificarCantidad(tipo.tipoAnimal, tipo.cantidad + 1)}
+                        >
+                          <Plus className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Tipos agregados (no declarados en DTE) */}
+            {tiposConfirmados.filter(t => !t.esDeclarado).length > 0 && (
+              <div className="space-y-2">
+                <Label className="text-base font-semibold flex items-center gap-2">
+                  Tipos Agregados (No Declarados)
+                  <Badge variant="outline" className="text-xs bg-red-50 text-red-600 border-red-200">Extra</Badge>
+                </Label>
+                <div className="border rounded-lg p-3 space-y-2 bg-red-50 border-red-200">
+                  {tiposConfirmados.filter(t => !t.esDeclarado).map((tipo) => (
+                    <div key={tipo.tipoAnimal} className="flex items-center justify-between bg-white p-2 rounded border border-red-200">
+                      <div className="flex items-center gap-3">
+                        <Badge className="bg-red-100 text-red-700">{tipo.tipoAnimal}</Badge>
+                        <span className="text-sm text-stone-500">
+                          {TIPOS_ANIMALES[tropaSeleccionada?.especie || 'BOVINO']?.find(t => t.codigo === tipo.tipoAnimal)?.label || tipo.tipoAnimal}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => handleModificarCantidad(tipo.tipoAnimal, Math.max(0, tipo.cantidad - 1))}
+                          disabled={tipo.cantidad <= 1}
+                        >
+                          <Minus className="w-4 h-4" />
+                        </Button>
+                        <Input 
+                          type="number" 
+                          className="w-16 text-center" 
+                          value={tipo.cantidad}
+                          onChange={(e) => handleModificarCantidad(tipo.tipoAnimal, parseInt(e.target.value) || 0)}
+                          min={0}
+                        />
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => handleModificarCantidad(tipo.tipoAnimal, tipo.cantidad + 1)}
+                        >
+                          <Plus className="w-4 h-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => handleEliminarTipo(tipo.tipoAnimal)}
+                          className="text-red-500 hover:text-red-700 hover:bg-red-100"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Agregar nuevo tipo */}
+            <div className="space-y-2">
+              <Label className="text-base font-semibold">Agregar Tipo No Declarado</Label>
+              <div className="flex gap-2">
+                <Select value={nuevoTipo} onValueChange={setNuevoTipo}>
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Seleccione tipo..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {tiposAnimalActuales
+                      .filter(t => !tiposConfirmados.some(tc => tc.tipoAnimal === t.codigo))
+                      .map((t) => (
+                        <SelectItem key={t.codigo} value={t.codigo}>
+                          {t.codigo} - {t.label}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+                <Input 
+                  type="number" 
+                  className="w-20" 
+                  value={nuevaCantidad}
+                  onChange={(e) => setNuevaCantidad(parseInt(e.target.value) || 1)}
+                  min={1}
+                />
+                <Button 
+                  variant="outline" 
+                  onClick={handleAgregarTipo}
+                  disabled={!nuevoTipo}
+                  className="bg-amber-50 border-amber-300 hover:bg-amber-100"
+                >
+                  <Plus className="w-4 h-4 mr-1" /> Agregar
+                </Button>
+              </div>
+            </div>
+
+            {/* Total */}
+            <div className="border-t pt-3 flex justify-between items-center">
+              <span className="font-semibold">Total Cabezas:</span>
+              <Badge className="text-lg px-4 py-2 bg-amber-100 text-amber-700">
+                {tiposConfirmados.reduce((acc, t) => acc + t.cantidad, 0)} cabezas
+              </Badge>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmarTiposOpen(false)}>
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleConfirmarTipos} 
+              className="bg-green-600 hover:bg-green-700"
+              disabled={tiposConfirmados.length === 0 || saving}
+            >
+              <CheckCircle className="w-4 h-4 mr-2" />
+              Confirmar Tipos
             </Button>
           </DialogFooter>
         </DialogContent>

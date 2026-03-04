@@ -49,3 +49,17 @@ prompt
 server.log
 # Skills directory
 /skills/
+
+# Database files
+*.db
+*.db-journal
+db/
+
+# User uploads
+upload/
+
+# Mini services
+mini-services/
+
+# Install docs with tokens
+INSTALACION-SOLEMAR-ALIMENTARIA.md
