@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
   try {
     const operadores = await db.operador.findMany({
       include: {
-        permisos: {
+        PermisoModulo: {
           orderBy: { modulo: 'asc' }
         }
       },
@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
       tienePin: !!op.pin,
       activo: op.activo,
       createdAt: op.createdAt,
-      permisos: op.permisos.map(p => ({
+      permisos: op.PermisoModulo.map(p => ({
         modulo: p.modulo,
         nivel: p.nivel
       }))
@@ -94,8 +94,8 @@ export async function POST(request: NextRequest) {
         pin: pin || null,
         email: email || null,
         activo: true,
-        permisos: {
-          create: permisos && permisos.length > 0 
+        PermisoModulo: {
+          create: permisos && permisos.length > 0
             ? permisos.map((p: { modulo: string; nivel: string }) => ({
                 modulo: p.modulo as ModuloSistema,
                 nivel: p.nivel as NivelPermiso
@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
         }
       },
       include: {
-        permisos: true
+        PermisoModulo: true
       }
     })
     
@@ -117,7 +117,7 @@ export async function POST(request: NextRequest) {
         id: operador.id,
         nombre: operador.nombre,
         usuario: operador.usuario,
-        permisos: operador.permisos
+        permisos: operador.PermisoModulo
       }
     })
   } catch (error) {

@@ -63,7 +63,7 @@ model AsignacionGarron {
 }
 
 model Auditoria {
-  id           String    @id
+  id           String    @id @default(cuid())
   operadorId   String?
   modulo       String
   accion       String

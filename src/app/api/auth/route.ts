@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
           activo: true
         },
         include: {
-          permisos: true
+          PermisoModulo: true
         }
       })
       
@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
       })
       
       // Formatear permisos como objeto para el frontend
-      const permisosFormateados = formatearPermisos(operador.permisos)
+      const permisosFormateados = formatearPermisos(operador.PermisoModulo)
       
       return NextResponse.json({
         success: true,
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
           activo: true
         },
         include: {
-          permisos: true
+          PermisoModulo: true
         }
       })
       
@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
       })
       
       // Formatear permisos como objeto para el frontend
-      const permisosFormateados = formatearPermisos(operador.permisos)
+      const permisosFormateados = formatearPermisos(operador.PermisoModulo)
       
       return NextResponse.json({
         success: true,
