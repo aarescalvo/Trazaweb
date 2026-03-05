@@ -1,543 +1,525 @@
-'use client'
+'use client';
 
-import { useState, useEffect } from 'react'
-import { Users, Plus, Edit, Trash2, Save, X, AlertTriangle, Shield, KeyRound, Mail } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Switch } from '@/components/ui/switch'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { toast } from 'sonner'
+import { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
+import { 
+  Users, 
+  Plus, 
+  Pencil, 
+  Trash2, 
+  Save, 
+  X, 
+  Shield,
+  ShieldCheck,
+  ShieldOff,
+  Key,
+  Mail
+} from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
-const ROLES = [
-  { id: 'OPERADOR', label: 'Operador', color: 'bg-blue-100 text-blue-700' },
-  { id: 'SUPERVISOR', label: 'Supervisor', color: 'bg-amber-100 text-amber-700' },
-  { id: 'ADMINISTRADOR', label: 'Administrador', color: 'bg-purple-100 text-purple-700' },
-]
+// Mapeo de nombres de módulos para mostrar
+const NOMBRES_MODULOS: Record<string, string> = {
+  PESAJE_CAMIONES: 'Pesaje Camiones',
+  PESAJE_INDIVIDUAL: 'Pesaje Individual',
+  MOVIMIENTO_HACIENDA: 'Movimiento Hacienda',
+  LISTA_FAENA: 'Lista de Faena',
+  INGRESO_FAENA: 'Ingreso a Faena',
+  CIERRE_FAENA: 'Cierre de Faena',
+  ROMANEO: 'Romaneo',
+  MENUDENCIAS: 'Menudencias',
+  STOCK_CAMARAS: 'Stock Cámaras',
+  FACTURACION: 'Facturación',
+  PRODUCTOS: 'Productos',
+  REPORTES: 'Reportes',
+  CONFIGURACION: 'Configuración',
+};
 
-const MODULOS = [
-  { id: 'puedePesajeCamiones', label: 'Pesaje Camiones', icon: '🚛' },
-  { id: 'puedePesajeIndividual', label: 'Pesaje Individual', icon: '⚖️' },
-  { id: 'puedeMovimientoHacienda', label: 'Movimiento Hacienda', icon: '🐄' },
-  { id: 'puedeListaFaena', label: 'Lista Faena', icon: '📋' },
-  { id: 'puedeRomaneo', label: 'Romaneo', icon: '📊' },
-  { id: 'puedeMenudencias', label: 'Menudencias', icon: '🫀' },
-  { id: 'puedeStock', label: 'Stock Cámaras', icon: '🏭' },
-  { id: 'puedeReportes', label: 'Reportes', icon: '📈' },
-  { id: 'puedeConfiguracion', label: 'Configuración', icon: '⚙️' },
-]
+const MODULOS = Object.keys(NOMBRES_MODULOS);
 
-interface OperadorItem {
-  id: string
-  nombre: string
-  usuario: string
-  email?: string
-  rol: string
-  pin?: string
-  activo: boolean
-  puedePesajeCamiones: boolean
-  puedePesajeIndividual: boolean
-  puedeMovimientoHacienda: boolean
-  puedeListaFaena: boolean
-  puedeRomaneo: boolean
-  puedeMenudencias: boolean
-  puedeStock: boolean
-  puedeReportes: boolean
-  puedeConfiguracion: boolean
+const NIVELES = [
+  { value: 'NINGUNO', label: 'Ninguno', color: 'bg-gray-200 text-gray-700' },
+  { value: 'OPERADOR', label: 'Operador', color: 'bg-blue-100 text-blue-700' },
+  { value: 'SUPERVISOR', label: 'Supervisor', color: 'bg-green-100 text-green-700' },
+];
+
+interface Permiso {
+  modulo: string;
+  nivel: string;
 }
 
 interface Operador {
-  id: string
-  nombre: string
-  nivel: string
+  id: string;
+  nombre: string;
+  usuario: string;
+  email: string | null;
+  tienePin: boolean;
+  activo: boolean;
+  createdAt: string;
+  permisos: Permiso[];
 }
 
-export function Operadores({ operador }: { operador: Operador }) {
-  const [operadores, setOperadores] = useState<OperadorItem[]>([])
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [deleteOpen, setDeleteOpen] = useState(false)
-  const [operadorEditando, setOperadorEditando] = useState<OperadorItem | null>(null)
+const permisoInicial = MODULOS.map(modulo => ({
+  modulo,
+  nivel: 'NINGUNO'
+}));
+
+export default function OperadoresManager() {
+  const { toast } = useToast();
+  const [operadores, setOperadores] = useState<Operador[]>([]);
+  const [modalAbierto, setModalAbierto] = useState(false);
+  const [operadorEditando, setOperadorEditando] = useState<Operador | null>(null);
+  const [cargando, setCargando] = useState(false);
   
-  const [formData, setFormData] = useState({
-    nombre: '',
-    usuario: '',
-    password: '',
-    email: '',
-    pin: '',
-    rol: 'OPERADOR',
-    puedePesajeCamiones: true,
-    puedePesajeIndividual: true,
-    puedeMovimientoHacienda: true,
-    puedeListaFaena: false,
-    puedeRomaneo: false,
-    puedeMenudencias: false,
-    puedeStock: false,
-    puedeReportes: false,
-    puedeConfiguracion: false
-  })
+  // Formulario
+  const [nombre, setNombre] = useState('');
+  const [usuario, setUsuario] = useState('');
+  const [password, setPassword] = useState('');
+  const [pin, setPin] = useState('');
+  const [email, setEmail] = useState('');
+  const [activo, setActivo] = useState(true);
+  const [permisos, setPermisos] = useState<Permiso[]>(permisoInicial);
+
+  // Cargar operadores
+  const cargarOperadores = async () => {
+    try {
+      const res = await fetch('/api/operadores');
+      const data = await res.json();
+      if (data.success) {
+        setOperadores(data.data);
+      }
+    } catch (error) {
+      console.error('Error cargando operadores:', error);
+      toast({
+        title: 'Error',
+        description: 'No se pudieron cargar los operadores',
+        variant: 'destructive',
+      });
+    }
+  };
 
   useEffect(() => {
-    fetchOperadores()
-  }, [])
+    cargarOperadores();
+  }, []);
 
-  const fetchOperadores = async () => {
+  // Abrir modal para nuevo
+  const abrirNuevo = () => {
+    setOperadorEditando(null);
+    setNombre('');
+    setUsuario('');
+    setPassword('');
+    setPin('');
+    setEmail('');
+    setActivo(true);
+    setPermisos(permisoInicial);
+    setModalAbierto(true);
+  };
+
+  // Abrir modal para editar
+  const abrirEditar = (op: Operador) => {
+    setOperadorEditando(op);
+    setNombre(op.nombre);
+    setUsuario(op.usuario);
+    setPassword('');
+    setPin('');
+    setEmail(op.email || '');
+    setActivo(op.activo);
+    setPermisos(op.permisos.length > 0 ? op.permisos : permisoInicial);
+    setModalAbierto(true);
+  };
+
+  // Cambiar nivel de permiso
+  const cambiarPermiso = (modulo: string, nivel: string) => {
+    setPermisos(prev => 
+      prev.map(p => p.modulo === modulo ? { ...p, nivel } : p)
+    );
+  };
+
+  // Establecer todos los permisos
+  const establecerTodos = (nivel: string) => {
+    setPermisos(prev => prev.map(p => ({ ...p, nivel })));
+  };
+
+  // Guardar operador
+  const guardar = async () => {
+    if (!nombre || !usuario) {
+      toast({
+        title: 'Error',
+        description: 'Nombre y usuario son obligatorios',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!operadorEditando && !password) {
+      toast({
+        title: 'Error',
+        description: 'La contraseña es obligatoria para nuevos operadores',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setCargando(true);
     try {
-      const res = await fetch('/api/operadores')
-      const data = await res.json()
-      if (data.success) {
-        setOperadores(data.data)
+      const body: any = {
+        nombre,
+        usuario,
+        email: email || null,
+        activo,
+        permisos
+      };
+
+      if (password) body.password = password;
+      if (pin) body.pin = pin;
+      
+      if (operadorEditando) {
+        body.id = operadorEditando.id;
       }
-    } catch (error) {
-      console.error('Error fetching operadores:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
 
-  const handleNuevo = () => {
-    setOperadorEditando(null)
-    setFormData({
-      nombre: '',
-      usuario: '',
-      password: '',
-      email: '',
-      pin: '',
-      rol: 'OPERADOR',
-      puedePesajeCamiones: true,
-      puedePesajeIndividual: true,
-      puedeMovimientoHacienda: true,
-      puedeListaFaena: false,
-      puedeRomaneo: false,
-      puedeMenudencias: false,
-      puedeStock: false,
-      puedeReportes: false,
-      puedeConfiguracion: false
-    })
-    setDialogOpen(true)
-  }
-
-  const handleEditar = (op: OperadorItem) => {
-    setOperadorEditando(op)
-    setFormData({
-      nombre: op.nombre,
-      usuario: op.usuario,
-      password: '',
-      email: op.email || '',
-      pin: op.pin || '',
-      rol: op.rol,
-      puedePesajeCamiones: op.puedePesajeCamiones,
-      puedePesajeIndividual: op.puedePesajeIndividual,
-      puedeMovimientoHacienda: op.puedeMovimientoHacienda,
-      puedeListaFaena: op.puedeListaFaena,
-      puedeRomaneo: op.puedeRomaneo,
-      puedeMenudencias: op.puedeMenudencias,
-      puedeStock: op.puedeStock,
-      puedeReportes: op.puedeReportes,
-      puedeConfiguracion: op.puedeConfiguracion
-    })
-    setDialogOpen(true)
-  }
-
-  const handleEliminar = (op: OperadorItem) => {
-    setOperadorEditando(op)
-    setDeleteOpen(true)
-  }
-
-  const handleGuardar = async () => {
-    if (!formData.nombre || !formData.usuario) {
-      toast.error('Complete nombre y usuario')
-      return
-    }
-
-    if (!operadorEditando && !formData.password) {
-      toast.error('Ingrese una contraseña para el nuevo operador')
-      return
-    }
-
-    setSaving(true)
-    try {
-      const url = '/api/operadores'
-      const method = operadorEditando ? 'PUT' : 'POST'
-      const body = operadorEditando 
-        ? { ...formData, id: operadorEditando.id }
-        : formData
-
-      const res = await fetch(url, {
-        method,
+      const res = await fetch('/api/operadores', {
+        method: operadorEditando ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
-      })
+      });
 
-      const data = await res.json()
-      if (data.success) {
-        toast.success(operadorEditando ? 'Operador actualizado' : 'Operador creado')
-        setDialogOpen(false)
-        fetchOperadores()
-      } else {
-        toast.error(data.error || 'Error al guardar')
+      const data = await res.json();
+
+      if (!data.success) {
+        throw new Error(data.error || 'Error al guardar');
       }
-    } catch (error) {
-      toast.error('Error de conexión')
+
+      toast({
+        title: operadorEditando ? 'Operador actualizado' : 'Operador creado',
+        description: 'Los cambios se guardaron correctamente',
+      });
+
+      setModalAbierto(false);
+      cargarOperadores();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
     } finally {
-      setSaving(false)
+      setCargando(false);
     }
-  }
+  };
 
-  const handleToggleActivo = async (op: OperadorItem) => {
+  // Eliminar operador
+  const eliminar = async (id: string) => {
+    if (!confirm('¿Está seguro de eliminar este operador?')) return;
+
     try {
-      const res = await fetch('/api/operadores', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          id: op.id, 
-          activo: !op.activo 
-        })
-      })
+      const res = await fetch(`/api/operadores?id=${id}`, { method: 'DELETE' });
+      const data = await res.json();
 
-      const data = await res.json()
-      if (data.success) {
-        toast.success(op.activo ? 'Operador desactivado' : 'Operador activado')
-        fetchOperadores()
-      }
+      if (!data.success) throw new Error('Error al eliminar');
+
+      toast({
+        title: 'Operador eliminado',
+        description: 'El operador fue eliminado correctamente',
+      });
+
+      cargarOperadores();
     } catch (error) {
-      toast.error('Error al actualizar')
+      toast({
+        title: 'Error',
+        description: 'No se pudo eliminar el operador',
+        variant: 'destructive',
+      });
     }
-  }
+  };
 
-  const handleConfirmarEliminar = async () => {
-    if (!operadorEditando) return
-
-    setSaving(true)
-    try {
-      const res = await fetch(`/api/operadores?id=${operadorEditando.id}`, {
-        method: 'DELETE'
-      })
-
-      const data = await res.json()
-      if (data.success) {
-        toast.success('Operador eliminado')
-        setDeleteOpen(false)
-        fetchOperadores()
-      } else {
-        toast.error(data.error || 'Error al eliminar')
-      }
-    } catch (error) {
-      toast.error('Error de conexión')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const handleRolChange = (rol: string) => {
-    let permisos = { ...formData }
-    permisos.rol = rol
-    
-    if (rol === 'ADMINISTRADOR') {
-      permisos = {
-        ...permisos,
-        puedePesajeCamiones: true,
-        puedePesajeIndividual: true,
-        puedeMovimientoHacienda: true,
-        puedeListaFaena: true,
-        puedeRomaneo: true,
-        puedeMenudencias: true,
-        puedeStock: true,
-        puedeReportes: true,
-        puedeConfiguracion: true
-      }
-    } else if (rol === 'SUPERVISOR') {
-      permisos = {
-        ...permisos,
-        puedePesajeCamiones: true,
-        puedePesajeIndividual: true,
-        puedeMovimientoHacienda: true,
-        puedeListaFaena: true,
-        puedeRomaneo: true,
-        puedeMenudencias: true,
-        puedeStock: true,
-        puedeReportes: true,
-        puedeConfiguracion: false
-      }
-    }
-    
-    setFormData(permisos)
-  }
-
-  const getRolBadge = (rol: string) => {
-    const role = ROLES.find(r => r.id === rol)
+  // Obtener badge de nivel
+  const getBadgeNivel = (nivel: string) => {
+    const n = NIVELES.find(n => n.value === nivel) || NIVELES[0];
     return (
-      <Badge className={role?.color || 'bg-gray-100'}>
-        {role?.label || rol}
+      <Badge variant="outline" className={n.color}>
+        {n.label}
       </Badge>
-    )
-  }
+    );
+  };
 
   return (
     <div className="space-y-6">
-      <Card className="border-0 shadow-md">
-        <CardHeader className="bg-stone-50 rounded-t-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Users className="w-5 h-5 text-amber-600" />
-                Gestión de Operadores
-              </CardTitle>
-              <CardDescription>
-                Usuarios del sistema con permisos detallados
-              </CardDescription>
-            </div>
-            <Button onClick={handleNuevo} className="bg-amber-500 hover:bg-amber-600">
-              <Plus className="w-4 h-4 mr-2" />
-              Nuevo Operador
-            </Button>
-          </div>
-        </CardHeader>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold flex items-center gap-2">
+            <Users className="h-6 w-6" />
+            Gestión de Operadores
+          </h2>
+          <p className="text-muted-foreground">
+            Administra usuarios y permisos del sistema
+          </p>
+        </div>
+        <Button onClick={abrirNuevo}>
+          <Plus className="h-4 w-4 mr-2" />
+          Nuevo Operador
+        </Button>
+      </div>
+
+      {/* Tabla de operadores */}
+      <Card>
         <CardContent className="p-0">
-          {loading ? (
-            <div className="p-8 text-center">
-              <Users className="w-8 h-8 animate-pulse mx-auto text-amber-500" />
-            </div>
-          ) : operadores.length === 0 ? (
-            <div className="p-8 text-center text-stone-400">
-              <Users className="w-12 h-12 mx-auto mb-3 opacity-50" />
-              <p>No hay operadores registrados</p>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nombre</TableHead>
+                <TableHead>Usuario</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead className="text-center">PIN</TableHead>
+                <TableHead className="text-center">Estado</TableHead>
+                <TableHead>Permisos Resumen</TableHead>
+                <TableHead className="text-right">Acciones</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {operadores.length === 0 ? (
                 <TableRow>
-                  <TableHead>Nombre</TableHead>
-                  <TableHead>Usuario</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Rol</TableHead>
-                  <TableHead>Permisos</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead>Acciones</TableHead>
+                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    No hay operadores registrados
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {operadores.map((op) => (
-                  <TableRow key={op.id} className={!op.activo ? 'opacity-50' : ''}>
-                    <TableCell className="font-medium">{op.nombre}</TableCell>
-                    <TableCell className="font-mono">{op.usuario}</TableCell>
-                    <TableCell>{op.email || '-'}</TableCell>
-                    <TableCell>{getRolBadge(op.rol)}</TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1">
-                        {MODULOS.filter(m => op[m.id as keyof OperadorItem] === true).slice(0, 3).map((m) => (
-                          <Badge key={m.id} variant="outline" className="text-xs">
-                            {m.icon} {m.label}
-                          </Badge>
-                        ))}
-                        {MODULOS.filter(m => op[m.id as keyof OperadorItem] === true).length > 3 && (
-                          <Badge variant="outline" className="text-xs">
-                            +{MODULOS.filter(m => op[m.id as keyof OperadorItem] === true).length - 3}
-                          </Badge>
+              ) : (
+                operadores.map(op => {
+                  const supervisorEn = op.permisos.filter(p => p.nivel === 'SUPERVISOR').length;
+                  const operadorEn = op.permisos.filter(p => p.nivel === 'OPERADOR').length;
+                  
+                  return (
+                    <TableRow key={op.id} className={!op.activo ? 'opacity-50' : ''}>
+                      <TableCell className="font-medium">{op.nombre}</TableCell>
+                      <TableCell className="font-mono">{op.usuario}</TableCell>
+                      <TableCell>{op.email || '-'}</TableCell>
+                      <TableCell className="text-center">
+                        {op.tienePin ? (
+                          <Key className="h-4 w-4 mx-auto text-amber-500" />
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
                         )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={op.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}>
-                        {op.activo ? 'Activo' : 'Inactivo'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <Button 
-                          variant="ghost" 
-                          size="icon"
-                          onClick={() => handleEditar(op)}
-                        >
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="icon"
-                          onClick={() => handleToggleActivo(op)}
-                          disabled={op.id === operador.id}
-                        >
-                          <Switch checked={op.activo} />
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="icon"
-                          onClick={() => handleEliminar(op)}
-                          className="text-red-500 hover:text-red-700"
-                          disabled={op.id === operador.id}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Badge variant={op.activo ? 'default' : 'secondary'}>
+                          {op.activo ? 'Activo' : 'Inactivo'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          {supervisorEn > 0 && (
+                            <Badge className="bg-green-100 text-green-700">
+                              <ShieldCheck className="h-3 w-3 mr-1" />
+                              {supervisorEn} Sup.
+                            </Badge>
+                          )}
+                          {operadorEn > 0 && (
+                            <Badge className="bg-blue-100 text-blue-700">
+                              <Shield className="h-3 w-3 mr-1" />
+                              {operadorEn} Op.
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button variant="ghost" size="icon" onClick={() => abrirEditar(op)}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => eliminar(op.id)}>
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
 
-      {/* Dialog Nuevo/Editar */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
+      {/* Modal de edición */}
+      <Dialog open={modalAbierto} onOpenChange={setModalAbierto}>
+        <DialogContent className="max-w-4xl max-h-[90vh] p-0">
+          <DialogHeader className="p-4 border-b bg-muted/50">
+            <DialogTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
               {operadorEditando ? 'Editar Operador' : 'Nuevo Operador'}
             </DialogTitle>
-            <DialogDescription>
-              Complete los datos y permisos del operador
-            </DialogDescription>
           </DialogHeader>
-          <div className="space-y-6 py-4">
-            {/* Datos básicos */}
-            <div className="space-y-4">
-              <h4 className="font-medium flex items-center gap-2">
-                <Users className="w-4 h-4" />
-                Datos del Operador
-              </h4>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Nombre Completo *</Label>
-                  <Input
-                    value={formData.nombre}
-                    onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
-                    placeholder="Juan Pérez"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Usuario *</Label>
-                  <div className="relative">
-                    <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
-                    <Input
-                      value={formData.usuario}
-                      onChange={(e) => setFormData({ ...formData, usuario: e.target.value.toLowerCase() })}
-                      placeholder="jperez"
-                      className="pl-10"
-                    />
-                  </div>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Contraseña {operadorEditando ? '(dejar vacío para no cambiar)' : '*'}</Label>
-                  <Input
-                    type="password"
-                    value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    placeholder="••••••••"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>PIN (opcional, 4-6 dígitos)</Label>
-                  <Input
-                    value={formData.pin}
-                    onChange={(e) => setFormData({ ...formData, pin: e.target.value.replace(/\D/g, '').slice(0, 6) })}
-                    placeholder="1234"
-                    maxLength={6}
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Email</Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
-                    <Input
-                      type="email"
-                      value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      placeholder="jperez@solemar.com.ar"
-                      className="pl-10"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Rol</Label>
-                  <Select value={formData.rol} onValueChange={handleRolChange}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ROLES.map((r) => (
-                        <SelectItem key={r.id} value={r.id}>{r.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </div>
 
-            {/* Permisos */}
-            <div className="space-y-4">
-              <h4 className="font-medium flex items-center gap-2">
-                <Shield className="w-4 h-4" />
-                Permisos por Módulo
-              </h4>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                {MODULOS.map((m) => (
-                  <label 
-                    key={m.id} 
-                    className={`flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${
-                      formData[m.id as keyof typeof formData] ? 'bg-amber-50 border-amber-200' : 'bg-white hover:bg-stone-50'
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={formData[m.id as keyof typeof formData] as boolean}
-                      onChange={(e) => setFormData({ ...formData, [m.id]: e.target.checked })}
-                      className="rounded"
+          <ScrollArea className="h-[calc(90vh-140px)]">
+            <div className="p-4 space-y-6">
+              {/* Datos básicos */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Datos de Acceso</CardTitle>
+                </CardHeader>
+                <CardContent className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Nombre completo *</Label>
+                    <Input
+                      value={nombre}
+                      onChange={e => setNombre(e.target.value)}
+                      placeholder="Juan Pérez"
                     />
-                    <span className="text-sm">{m.icon} {m.label}</span>
-                  </label>
-                ))}
-              </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Usuario *</Label>
+                    <Input
+                      value={usuario}
+                      onChange={e => setUsuario(e.target.value.toLowerCase().replace(/\s/g, ''))}
+                      placeholder="usuario"
+                      className="font-mono"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Contraseña {operadorEditando ? '(dejar vacío para no cambiar)' : '*'}</Label>
+                    <Input
+                      type="password"
+                      value={password}
+                      onChange={e => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>PIN (para autorización rápida)</Label>
+                    <Input
+                      type="password"
+                      value={pin}
+                      onChange={e => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      placeholder="4-6 dígitos"
+                      maxLength={6}
+                      className="font-mono"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Solo para supervisores que necesiten autorizar operaciones
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Email</Label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        type="email"
+                        value={email}
+                        onChange={e => setEmail(e.target.value)}
+                        placeholder="usuario@ejemplo.com"
+                        className="pl-9"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2 flex items-center gap-3 pt-6">
+                    <Switch
+                      checked={activo}
+                      onCheckedChange={setActivo}
+                    />
+                    <Label>Usuario activo</Label>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Permisos */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base">Permisos por Módulo</CardTitle>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" onClick={() => establecerTodos('NINGUNO')}>
+                        <ShieldOff className="h-3 w-3 mr-1" />
+                        Ninguno
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => establecerTodos('OPERADOR')}>
+                        <Shield className="h-3 w-3 mr-1" />
+                        Operador
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => establecerTodos('SUPERVISOR')}>
+                        <ShieldCheck className="h-3 w-3 mr-1" />
+                        Supervisor
+                      </Button>
+                    </div>
+                  </div>
+                  <CardDescription>
+                    NINGUNO: Sin acceso | OPERADOR: Puede operar | SUPERVISOR: Puede autorizar operaciones críticas
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-2">
+                    {MODULOS.map(modulo => {
+                      const permiso = permisos.find(p => p.modulo === modulo);
+                      const nivel = permiso?.nivel || 'NINGUNO';
+                      
+                      return (
+                        <div
+                          key={modulo}
+                          className="flex items-center justify-between p-2 rounded-lg border bg-muted/30"
+                        >
+                          <Label className="text-sm">{NOMBRES_MODULOS[modulo]}</Label>
+                          <Select
+                            value={nivel}
+                            onValueChange={v => cambiarPermiso(modulo, v)}
+                          >
+                            <SelectTrigger className="w-32">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {NIVELES.map(n => (
+                                <SelectItem key={n.value} value={n.value}>
+                                  {n.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
             </div>
+          </ScrollArea>
+
+          {/* Botones */}
+          <div className="border-t p-4 flex justify-end gap-3 bg-muted/50">
+            <Button variant="outline" onClick={() => setModalAbierto(false)}>
+              <X className="h-4 w-4 mr-2" />
+              Cancelar
+            </Button>
+            <Button onClick={guardar} disabled={cargando}>
+              <Save className="h-4 w-4 mr-2" />
+              {cargando ? 'Guardando...' : 'Guardar'}
+            </Button>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>
-              <X className="w-4 h-4 mr-2" />
-              Cancelar
-            </Button>
-            <Button onClick={handleGuardar} disabled={saving} className="bg-amber-500 hover:bg-amber-600">
-              <Save className="w-4 h-4 mr-2" />
-              {saving ? 'Guardando...' : 'Guardar'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Dialog Eliminar */}
-      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-red-600">
-              <AlertTriangle className="w-5 h-5" />
-              Eliminar Operador
-            </DialogTitle>
-            <DialogDescription>
-              ¿Está seguro que desea eliminar al operador &quot;{operadorEditando?.nombre}&quot;?
-              Esta acción no se puede deshacer.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteOpen(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={handleConfirmarEliminar} disabled={saving} className="bg-red-600 hover:bg-red-700">
-              {saving ? 'Eliminando...' : 'Eliminar'}
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
-  )
+  );
 }
-
-export default Operadores

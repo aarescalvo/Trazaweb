@@ -258,25 +258,15 @@ model Operador {
   nombre        String
   usuario       String   @unique
   password      String   // Hash de la contraseña
-  pin           String?  // PIN numérico opcional
-  rol           RolOperador @default(OPERADOR)
+  pin           String?  // PIN numérico para autorización rápida (solo supervisores)
   email         String?
   activo        Boolean  @default(true)
   
-  // Permisos detallados
-  puedePesajeCamiones     Boolean @default(true)
-  puedePesajeIndividual   Boolean @default(true)
-  puedeMovimientoHacienda Boolean @default(true)
-  puedeListaFaena         Boolean @default(false)
-  puedeRomaneo            Boolean @default(false)
-  puedeMenudencias        Boolean @default(false)
-  puedeStock              Boolean @default(false)
-  puedeReportes           Boolean @default(false)
-  puedeConfiguracion      Boolean @default(false)
-  puedeFacturacion        Boolean @default(false)
-  
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+  
+  // Permisos granulares por módulo
+  permisos      PermisoModulo[]
   
   // Relaciones
   pesajesCamion        PesajeCamion[]
@@ -287,12 +277,70 @@ model Operador {
   movimientosCorral    MovimientoCorral[]
   movimientosCamara    MovimientoCamara[]
   auditorias           Auditoria[]
+  autorizaciones       AutorizacionOperacion[]
 }
 
-enum RolOperador {
-  OPERADOR
-  SUPERVISOR
-  ADMINISTRADOR
+// Permisos granulares por módulo
+model PermisoModulo {
+  id            String        @id @default(cuid())
+  operadorId    String
+  operador      Operador      @relation(fields: [operadorId], references: [id], onDelete: Cascade)
+  
+  modulo        ModuloSistema
+  nivel         NivelPermiso  @default(OPERADOR)
+  
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  
+  @@unique([operadorId, modulo])
+  @@index([modulo])
+}
+
+// Módulos del sistema
+enum ModuloSistema {
+  PESAJE_CAMIONES
+  PESAJE_INDIVIDUAL
+  MOVIMIENTO_HACIENDA
+  LISTA_FAENA
+  INGRESO_FAENA
+  CIERRE_FAENA
+  ROMANEO
+  MENUDENCIAS
+  STOCK_CAMARAS
+  FACTURACION
+  PRODUCTOS
+  REPORTES
+  CONFIGURACION
+}
+
+// Niveles de permiso
+enum NivelPermiso {
+  NINGUNO      // No puede acceder
+  OPERADOR     // Puede acceder y operar
+  SUPERVISOR   // Puede autorizar operaciones críticas
+}
+
+// Registro de autorizaciones (para auditoría)
+model AutorizacionOperacion {
+  id              String   @id @default(cuid())
+  operadorId      String
+  operador        Operador @relation(fields: [operadorId], references: [id])
+  
+  modulo          String   // Módulo donde se autorizó
+  accion          String   // Acción autorizada (cerrar_faena, confirmar_romaneo, etc.)
+  entidadId       String?  // ID de la entidad afectada
+  
+  autorizadoPorId String?  // ID del supervisor que autorizó (si usó PIN)
+  metodoAutorizacion String? // "PIN", "PASSWORD", "SESSION"
+  
+  observaciones   String?
+  fecha           DateTime @default(now())
+  
+  createdAt       DateTime @default(now())
+  
+  @@index([operadorId])
+  @@index([modulo])
+  @@index([fecha])
 }
 
 // ==================== CLIENTES / PROVEEDORES ====================

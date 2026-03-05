@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import bcrypt from 'bcryptjs'
+import { NivelPermiso, ModuloSistema } from '@prisma/client'
 
 // POST - Login con usuario/password o PIN
 export async function POST(request: NextRequest) {
@@ -14,6 +15,9 @@ export async function POST(request: NextRequest) {
         where: {
           usuario: String(usuario),
           activo: true
+        },
+        include: {
+          permisos: true
         }
       })
       
@@ -45,35 +49,31 @@ export async function POST(request: NextRequest) {
         }
       })
       
+      // Formatear permisos como objeto para el frontend
+      const permisosFormateados = formatearPermisos(operador.permisos)
+      
       return NextResponse.json({
         success: true,
         data: {
           id: operador.id,
           nombre: operador.nombre,
           usuario: operador.usuario,
-          rol: operador.rol,
           email: operador.email,
-          permisos: {
-            puedePesajeCamiones: operador.puedePesajeCamiones,
-            puedePesajeIndividual: operador.puedePesajeIndividual,
-            puedeMovimientoHacienda: operador.puedeMovimientoHacienda,
-            puedeListaFaena: operador.puedeListaFaena,
-            puedeRomaneo: operador.puedeRomaneo,
-            puedeMenudencias: operador.puedeMenudencias,
-            puedeStock: operador.puedeStock,
-            puedeReportes: operador.puedeReportes,
-            puedeConfiguracion: operador.puedeConfiguracion
-          }
+          tienePin: !!operador.pin,
+          permisos: permisosFormateados
         }
       })
     }
     
-    // Login con PIN (alternativa rápida)
+    // Login con PIN (para autorización rápida de operaciones críticas)
     if (pin) {
       const operador = await db.operador.findFirst({
         where: {
           pin: String(pin),
           activo: true
+        },
+        include: {
+          permisos: true
         }
       })
       
@@ -96,25 +96,18 @@ export async function POST(request: NextRequest) {
         }
       })
       
+      // Formatear permisos como objeto para el frontend
+      const permisosFormateados = formatearPermisos(operador.permisos)
+      
       return NextResponse.json({
         success: true,
         data: {
           id: operador.id,
           nombre: operador.nombre,
           usuario: operador.usuario,
-          rol: operador.rol,
           email: operador.email,
-          permisos: {
-            puedePesajeCamiones: operador.puedePesajeCamiones,
-            puedePesajeIndividual: operador.puedePesajeIndividual,
-            puedeMovimientoHacienda: operador.puedeMovimientoHacienda,
-            puedeListaFaena: operador.puedeListaFaena,
-            puedeRomaneo: operador.puedeRomaneo,
-            puedeMenudencias: operador.puedeMenudencias,
-            puedeStock: operador.puedeStock,
-            puedeReportes: operador.puedeReportes,
-            puedeConfiguracion: operador.puedeConfiguracion
-          }
+          tienePin: !!operador.pin,
+          permisos: permisosFormateados
         }
       })
     }
@@ -157,4 +150,19 @@ export async function DELETE(request: NextRequest) {
     console.error('Error en logout:', error)
     return NextResponse.json({ success: true })
   }
+}
+
+// Función helper para formatear permisos
+function formatearPermisos(permisos: { modulo: ModuloSistema; nivel: NivelPermiso }[]) {
+  const resultado: Record<string, { nivel: string; puedeAcceder: boolean; puedeSupervisar: boolean }> = {}
+  
+  for (const p of permisos) {
+    resultado[p.modulo] = {
+      nivel: p.nivel,
+      puedeAcceder: p.nivel !== 'NINGUNO',
+      puedeSupervisar: p.nivel === 'SUPERVISOR'
+    }
+  }
+  
+  return resultado
 }

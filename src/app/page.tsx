@@ -35,20 +35,26 @@ interface Operador {
   id: string
   nombre: string
   usuario: string
-  rol: string
   email?: string
-  permisos: {
-    puedePesajeCamiones: boolean
-    puedePesajeIndividual: boolean
-    puedeMovimientoHacienda: boolean
-    puedeListaFaena: boolean
-    puedeRomaneo: boolean
-    puedeMenudencias: boolean
-    puedeStock: boolean
-    puedeReportes: boolean
-    puedeConfiguracion: boolean
-    puedeFacturacion: boolean
-  }
+  tienePin?: boolean
+  permisos: Record<string, { nivel: string; puedeAcceder: boolean; puedeSupervisar: boolean }>
+}
+
+// Mapeo de páginas a módulos del sistema
+const MODULO_MAP: Record<string, string> = {
+  pesajeCamiones: 'PESAJE_CAMIONES',
+  pesajeIndividual: 'PESAJE_INDIVIDUAL',
+  movimientoHacienda: 'MOVIMIENTO_HACIENDA',
+  listaFaena: 'LISTA_FAENA',
+  ingresoFaena: 'INGRESO_FAENA',
+  cierreFaena: 'CIERRE_FAENA',
+  romaneo: 'ROMANEO',
+  menudencias: 'MENUDENCIAS',
+  stock: 'STOCK_CAMARAS',
+  facturacion: 'FACTURACION',
+  productos: 'PRODUCTOS',
+  reportes: 'REPORTES',
+  configuracion: 'CONFIGURACION',
 }
 
 interface Tropa {
@@ -79,19 +85,19 @@ type Page = 'dashboard' | 'pesajeCamiones' | 'movimientoHacienda' | 'pesajeIndiv
 
 const NAV_ITEMS = [
   { id: 'dashboard' as Page, label: 'Dashboard', icon: Beef },
-  { id: 'pesajeCamiones' as Page, label: 'Pesaje Camiones', icon: Truck, permiso: 'puedePesajeCamiones' },
-  { id: 'pesajeIndividual' as Page, label: 'Pesaje Individual', icon: Scale, permiso: 'puedePesajeIndividual' },
-  { id: 'movimientoHacienda' as Page, label: 'Movimiento Hacienda', icon: RefreshCw, permiso: 'puedeMovimientoHacienda' },
-  { id: 'listaFaena' as Page, label: 'Lista de Faena', icon: ClipboardList, permiso: 'puedeListaFaena' },
-  { id: 'ingresoFaena' as Page, label: 'Ingreso a Faena', icon: LogIn, permiso: 'puedeListaFaena' },
-  { id: 'cierreFaena' as Page, label: 'Cierre de Faena', icon: ClipboardCheck, permiso: 'puedeListaFaena' },
-  { id: 'romaneo' as Page, label: 'Romaneo', icon: TrendingUp, permiso: 'puedeRomaneo' },
-  { id: 'menudencias' as Page, label: 'Menudencias por Tropa', icon: Package, permiso: 'puedeMenudencias' },
-  { id: 'stock' as Page, label: 'Stock Cámaras', icon: Warehouse, permiso: 'puedeStock' },
-  { id: 'facturacion' as Page, label: 'Facturación', icon: DollarSign, permiso: 'puedeFacturacion' },
-  { id: 'productos' as Page, label: 'Productos', icon: Tag, permiso: 'puedeConfiguracion' },
-  { id: 'reportes' as Page, label: 'Reportes', icon: FileText, permiso: 'puedeReportes' },
-  { id: 'configuracion' as Page, label: 'Configuración', icon: Settings, permiso: 'puedeConfiguracion' },
+  { id: 'pesajeCamiones' as Page, label: 'Pesaje Camiones', icon: Truck, modulo: 'PESAJE_CAMIONES' },
+  { id: 'pesajeIndividual' as Page, label: 'Pesaje Individual', icon: Scale, modulo: 'PESAJE_INDIVIDUAL' },
+  { id: 'movimientoHacienda' as Page, label: 'Movimiento Hacienda', icon: RefreshCw, modulo: 'MOVIMIENTO_HACIENDA' },
+  { id: 'listaFaena' as Page, label: 'Lista de Faena', icon: ClipboardList, modulo: 'LISTA_FAENA' },
+  { id: 'ingresoFaena' as Page, label: 'Ingreso a Faena', icon: LogIn, modulo: 'INGRESO_FAENA' },
+  { id: 'cierreFaena' as Page, label: 'Cierre de Faena', icon: ClipboardCheck, modulo: 'CIERRE_FAENA' },
+  { id: 'romaneo' as Page, label: 'Romaneo', icon: TrendingUp, modulo: 'ROMANEO' },
+  { id: 'menudencias' as Page, label: 'Menudencias por Tropa', icon: Package, modulo: 'MENUDENCIAS' },
+  { id: 'stock' as Page, label: 'Stock Cámaras', icon: Warehouse, modulo: 'STOCK_CAMARAS' },
+  { id: 'facturacion' as Page, label: 'Facturación', icon: DollarSign, modulo: 'FACTURACION' },
+  { id: 'productos' as Page, label: 'Productos', icon: Tag, modulo: 'PRODUCTOS' },
+  { id: 'reportes' as Page, label: 'Reportes', icon: FileText, modulo: 'REPORTES' },
+  { id: 'configuracion' as Page, label: 'Configuración', icon: Settings, modulo: 'CONFIGURACION' },
 ]
 
 export default function FrigorificoApp() {
@@ -205,18 +211,27 @@ export default function FrigorificoApp() {
     setCurrentPage('dashboard')
   }
 
-  // Check permission
+  // Check permission - devuelve true si puede acceder (nivel != NINGUNO)
   const canAccess = (page: Page): boolean => {
     if (!operador) return false
     const item = NAV_ITEMS.find(n => n.id === page)
-    if (!item?.permiso) return true
-    return operador.permisos[item.permiso as keyof typeof operador.permisos] === true
+    if (!item?.modulo) return true // Dashboard no tiene módulo
+    const permiso = operador.permisos[item.modulo]
+    return permiso?.puedeAcceder === true
+  }
+
+  // Check if user is supervisor for a module
+  const isSupervisor = (modulo: string): boolean => {
+    if (!operador) return false
+    const permiso = operador.permisos[modulo]
+    return permiso?.puedeSupervisar === true
   }
 
   // Filter nav items by permission
   const visibleNavItems = NAV_ITEMS.filter(item => {
-    if (!item.permiso) return true
-    return operador?.permisos[item.permiso as keyof typeof operador.permisos] === true
+    if (!item.modulo) return true // Dashboard siempre visible
+    const permiso = operador?.permisos[item.modulo]
+    return permiso?.puedeAcceder === true
   })
 
   // Loading screen
@@ -541,13 +556,13 @@ export default function FrigorificoApp() {
               <Users className="w-4 h-4 text-stone-400" />
               <div>
                 <p className="text-sm font-medium text-stone-700">{operador.nombre}</p>
-                <p className="text-xs text-stone-400">{operador.rol}</p>
+                <p className="text-xs text-stone-400">{operador.usuario}</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
               <ConnectionIndicator />
               <Button variant="ghost" size="icon" onClick={handleLogout} className="h-8 w-8 text-stone-400 hover:text-red-500">
-                <LogOut className="w-4 h-4" />
+                <LogOut className="w-4 w-4" />
               </Button>
             </div>
           </div>

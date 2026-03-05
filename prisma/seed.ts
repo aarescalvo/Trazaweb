@@ -1,18 +1,38 @@
 // Script para crear datos de prueba
 // Ejecutar con: bun run db:seed
 
-import { PrismaClient, Especie, RolOperador, TipoAnimal } from '@prisma/client'
+import { PrismaClient, Especie, TipoAnimal, ModuloSistema, NivelPermiso } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 
 const prisma = new PrismaClient()
 
+// Función para crear permisos completos
+async function crearPermisos(operadorId: string, nivelBase: NivelPermiso, modulosEspeciales?: { modulo: ModuloSistema, nivel: NivelPermiso }[]) {
+  const modulos = Object.values(ModuloSistema)
+  
+  for (const modulo of modulos) {
+    // Buscar si hay un nivel especial para este módulo
+    const especial = modulosEspeciales?.find(m => m.modulo === modulo)
+    const nivel = especial?.nivel || nivelBase
+    
+    await prisma.permisoModulo.create({
+      data: {
+        operadorId,
+        modulo,
+        nivel
+      }
+    })
+  }
+}
+
 async function main() {
   console.log('🌱 Iniciando seed de datos de prueba...')
 
-  // 1. Crear operadores
+  // 1. Crear operadores con permisos granulares
   console.log('📝 Creando operadores...')
   const passwordHash = await bcrypt.hash('admin123', 10)
   
+  // Admin - Supervisor en todos los módulos
   const admin = await prisma.operador.upsert({
     where: { usuario: 'admin' },
     update: {},
@@ -21,21 +41,18 @@ async function main() {
       usuario: 'admin',
       password: passwordHash,
       pin: '1234',
-      rol: RolOperador.ADMINISTRADOR,
       email: 'admin@solemar.com.ar',
-      activo: true,
-      puedePesajeCamiones: true,
-      puedePesajeIndividual: true,
-      puedeMovimientoHacienda: true,
-      puedeListaFaena: true,
-      puedeRomaneo: true,
-      puedeMenudencias: true,
-      puedeStock: true,
-      puedeReportes: true,
-      puedeConfiguracion: true
+      activo: true
     }
   })
+  
+  // Crear permisos de admin (SUPERVISOR en todos los módulos)
+  const permisosAdminExistentes = await prisma.permisoModulo.count({ where: { operadorId: admin.id } })
+  if (permisosAdminExistentes === 0) {
+    await crearPermisos(admin.id, NivelPermiso.SUPERVISOR)
+  }
 
+  // Operador de Balanza - Solo puede pesaje, pero SUPERVISOR en pesajes
   const operador1 = await prisma.operador.upsert({
     where: { usuario: 'balanza' },
     update: {},
@@ -43,21 +60,20 @@ async function main() {
       nombre: 'Juan Pérez',
       usuario: 'balanza',
       password: await bcrypt.hash('balanza123', 10),
-      pin: '1111',
-      rol: RolOperador.OPERADOR,
-      activo: true,
-      puedePesajeCamiones: true,
-      puedePesajeIndividual: true,
-      puedeMovimientoHacienda: true,
-      puedeListaFaena: false,
-      puedeRomaneo: false,
-      puedeMenudencias: false,
-      puedeStock: false,
-      puedeReportes: false,
-      puedeConfiguracion: false
+      activo: true
     }
   })
+  
+  const permisosBalanzaExistentes = await prisma.permisoModulo.count({ where: { operadorId: operador1.id } })
+  if (permisosBalanzaExistentes === 0) {
+    await crearPermisos(operador1.id, NivelPermiso.NINGUNO, [
+      { modulo: ModuloSistema.PESAJE_CAMIONES, nivel: NivelPermiso.SUPERVISOR },
+      { modulo: ModuloSistema.PESAJE_INDIVIDUAL, nivel: NivelPermiso.SUPERVISOR },
+      { modulo: ModuloSistema.MOVIMIENTO_HACIENDA, nivel: NivelPermiso.OPERADOR },
+    ])
+  }
 
+  // Jefe de Planta - Supervisor en faena y romaneo, operador en stock
   const supervisor = await prisma.operador.upsert({
     where: { usuario: 'supervisor' },
     update: {},
@@ -66,22 +82,72 @@ async function main() {
       usuario: 'supervisor',
       password: await bcrypt.hash('super123', 10),
       pin: '2222',
-      rol: RolOperador.SUPERVISOR,
       email: 'maria@solemar.com.ar',
-      activo: true,
-      puedePesajeCamiones: true,
-      puedePesajeIndividual: true,
-      puedeMovimientoHacienda: true,
-      puedeListaFaena: true,
-      puedeRomaneo: true,
-      puedeMenudencias: true,
-      puedeStock: true,
-      puedeReportes: true,
-      puedeConfiguracion: false
+      activo: true
     }
   })
+  
+  const permisosSuperExistentes = await prisma.permisoModulo.count({ where: { operadorId: supervisor.id } })
+  if (permisosSuperExistentes === 0) {
+    await crearPermisos(supervisor.id, NivelPermiso.NINGUNO, [
+      { modulo: ModuloSistema.PESAJE_CAMIONES, nivel: NivelPermiso.OPERADOR },
+      { modulo: ModuloSistema.PESAJE_INDIVIDUAL, nivel: NivelPermiso.OPERADOR },
+      { modulo: ModuloSistema.MOVIMIENTO_HACIENDA, nivel: NivelPermiso.OPERADOR },
+      { modulo: ModuloSistema.LISTA_FAENA, nivel: NivelPermiso.SUPERVISOR },
+      { modulo: ModuloSistema.INGRESO_FAENA, nivel: NivelPermiso.SUPERVISOR },
+      { modulo: ModuloSistema.CIERRE_FAENA, nivel: NivelPermiso.SUPERVISOR },
+      { modulo: ModuloSistema.ROMANEO, nivel: NivelPermiso.SUPERVISOR },
+      { modulo: ModuloSistema.MENUDENCIAS, nivel: NivelPermiso.OPERADOR },
+      { modulo: ModuloSistema.STOCK_CAMARAS, nivel: NivelPermiso.OPERADOR },
+      { modulo: ModuloSistema.REPORTES, nivel: NivelPermiso.OPERADOR },
+    ])
+  }
 
-  console.log(`   ✓ Operadores creados: ${admin.nombre}, ${operador1.nombre}, ${supervisor.nombre}`)
+  // Operador de Cámara - Solo stock y menudencias
+  const operadorCamara = await prisma.operador.upsert({
+    where: { usuario: 'camara' },
+    update: {},
+    create: {
+      nombre: 'Carlos López',
+      usuario: 'camara',
+      password: await bcrypt.hash('camara123', 10),
+      activo: true
+    }
+  })
+  
+  const permisosCamaraExistentes = await prisma.permisoModulo.count({ where: { operadorId: operadorCamara.id } })
+  if (permisosCamaraExistentes === 0) {
+    await crearPermisos(operadorCamara.id, NivelPermiso.NINGUNO, [
+      { modulo: ModuloSistema.STOCK_CAMARAS, nivel: NivelPermiso.SUPERVISOR },
+      { modulo: ModuloSistema.MENUDENCIAS, nivel: NivelPermiso.OPERADOR },
+    ])
+  }
+
+  // Administrativo - Facturación y reportes
+  const administrativo = await prisma.operador.upsert({
+    where: { usuario: 'admin2' },
+    update: {},
+    create: {
+      nombre: 'Ana Martínez',
+      usuario: 'admin2',
+      password: await bcrypt.hash('admin123', 10),
+      pin: '3333',
+      email: 'ana@solemar.com.ar',
+      activo: true
+    }
+  })
+  
+  const permisosAdmin2Existentes = await prisma.permisoModulo.count({ where: { operadorId: administrativo.id } })
+  if (permisosAdmin2Existentes === 0) {
+    await crearPermisos(administrativo.id, NivelPermiso.NINGUNO, [
+      { modulo: ModuloSistema.FACTURACION, nivel: NivelPermiso.SUPERVISOR },
+      { modulo: ModuloSistema.REPORTES, nivel: NivelPermiso.SUPERVISOR },
+      { modulo: ModuloSistema.PRODUCTOS, nivel: NivelPermiso.OPERADOR },
+      { modulo: ModuloSistema.CONFIGURACION, nivel: NivelPermiso.OPERADOR },
+    ])
+  }
+
+  console.log(`   ✓ 5 operadores creados con permisos granulares`)
 
   // 2. Crear transportistas
   console.log('🚛 Creando transportistas...')
@@ -688,9 +754,11 @@ async function main() {
 
   console.log('\n✅ Seed completado exitosamente!')
   console.log('\n📋 Datos de acceso:')
-  console.log('   Admin: admin / admin123 (PIN: 1234)')
-  console.log('   Balanza: balanza / balanza123 (PIN: 1111)')
-  console.log('   Supervisor: supervisor / super123 (PIN: 2222)')
+  console.log('   Admin: admin / admin123 (PIN: 1234) - SUPERVISOR en todos los módulos')
+  console.log('   Balanza: balanza / balanza123 - SUPERVISOR Pesaje, OPERADOR Movimiento')
+  console.log('   Supervisor: supervisor / super123 (PIN: 2222) - SUPERVISOR Faena/Romaneo')
+  console.log('   Cámara: camara / camara123 - SUPERVISOR Stock, OPERADOR Menudencias')
+  console.log('   Admin2: admin2 / admin123 (PIN: 3333) - SUPERVISOR Facturación/Reportes')
   console.log('\n📊 Tropas creadas:')
   console.log('   - B 2025 0001: 20 animales PESADOS (9,450 kg total)')
   console.log('   - B 2025 0002: 15 animales PESADOS (7,230 kg total)')

@@ -7,7 +7,7 @@ import { Corrales } from './corrales'
 import { Camaras } from './camaras'
 import { Tipificadores } from './tipificadores'
 import { Productos } from './productos'
-import { Operadores } from './operadores'
+import OperadoresManager from './operadores'
 import { Transportistas } from './transportistas'
 import { Clientes } from './clientes'
 import { Razas } from './razas'
@@ -19,7 +19,7 @@ import { Articulos } from './articulos'
 interface Operador {
   id: string
   nombre: string
-  nivel: string
+  permisos?: Record<string, { nivel: string; puedeAcceder: boolean; puedeSupervisar: boolean }>
 }
 
 export function ConfiguracionModule({ operador }: { operador: Operador }) {
@@ -115,7 +115,7 @@ export function ConfiguracionModule({ operador }: { operador: Operador }) {
             <Transportistas operador={operador} />
           </TabsContent>
           <TabsContent value="operadores">
-            <Operadores operador={operador} />
+            <OperadoresManager />
           </TabsContent>
           <TabsContent value="subproductos">
             <Subproductos operador={operador} />
