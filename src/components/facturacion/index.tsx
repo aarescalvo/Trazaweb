@@ -121,8 +121,8 @@ export function FacturacionModule({ operador }: { operador: Operador }) {
   // Filtros
   const [filtroMes, setFiltroMes] = useState(new Date().getMonth() + 1)
   const [filtroAnio, setFiltroAnio] = useState(new Date().getFullYear())
-  const [filtroCliente, setFiltroCliente] = useState('')
-  const [filtroEstado, setFiltroEstado] = useState('')
+  const [filtroCliente, setFiltroCliente] = useState('todos')
+  const [filtroEstado, setFiltroEstado] = useState('todos')
 
   // Diálogos
   const [nuevaFacturaOpen, setNuevaFacturaOpen] = useState(false)
@@ -404,8 +404,8 @@ export function FacturacionModule({ operador }: { operador: Operador }) {
 
   // Filtrar facturas
   const facturasFiltradas = facturas.filter(f => {
-    if (filtroCliente && f.clienteId !== filtroCliente) return false
-    if (filtroEstado && f.estado !== filtroEstado) return false
+    if (filtroCliente !== 'todos' && f.clienteId !== filtroCliente) return false
+    if (filtroEstado !== 'todos' && f.estado !== filtroEstado) return false
     return true
   })
 
@@ -657,7 +657,7 @@ export function FacturacionModule({ operador }: { operador: Operador }) {
                         <SelectValue placeholder="Todos" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Todos</SelectItem>
+                        <SelectItem value="todos">Todos</SelectItem>
                         {clientes.map(c => (
                           <SelectItem key={c.id} value={c.id}>{c.nombre}</SelectItem>
                         ))}
@@ -671,7 +671,7 @@ export function FacturacionModule({ operador }: { operador: Operador }) {
                         <SelectValue placeholder="Todos" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Todos</SelectItem>
+                        <SelectItem value="todos">Todos</SelectItem>
                         <SelectItem value="PENDIENTE">Pendiente</SelectItem>
                         <SelectItem value="PAGADA">Pagada</SelectItem>
                         <SelectItem value="ANULADA">Anulada</SelectItem>
