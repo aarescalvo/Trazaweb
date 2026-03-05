@@ -96,9 +96,64 @@ model Tipificador {
 model Producto {
   id                    String          @id @default(cuid())
   codigo                String          // Código de artículo (3 dígitos)
+  codigoSecundario      String?         // Segundo código (campo azul en la imagen)
   nombre                String
-  nombreReportes        String?
-  especie               Especie
+  
+  // Datos técnicos
+  tara                  Float?          // Peso tara
+  vencimiento           Int?            // Días de vencimiento (VTO)
+  nroSenasa             String?         // Número SENASA
+  unidad                String?         // Unidad de medida (kg, unidades, etc.)
+  cantidadEtiquetas     Int?            // CANT ETI - cantidad de etiquetas
+  
+  // Tipificación
+  tieneTipificacion     Boolean         @default(false)
+  tipificacion          String?         // Código de tipificación
+  tipificacionSecundaria String?        // Segundo campo de tipificación
+  
+  // Tipo de producto
+  tipo                  String?         // Tipo de producto
+  tipoGeneral           String?         // TIPO GRAL
+  
+  // Descripción y precios
+  descripcionCircular   String?         // DESCRI. CIRCULAR
+  precioDolar           Float?          // P.DOLAR
+  precioEuro            Float?          // P.EURO
+  
+  // Producción
+  producidoParaCliente  String?         // Cliente para quien se produce
+  producidoDePieza      String?         // Pieza de origen
+  productoGeneral       String?         // Producto general
+  productoRepoRinde     String?         // Producto reposición rinde
+  
+  // Tipo de trabajo
+  tipoTrabajo           TipoTrabajoProducto @default(NINGUNO)  // LAMA, MR, NINGUNO
+  
+  // Idioma de etiqueta
+  idiomaEtiqueta        IdiomaEtiqueta  @default(ESPAÑOL)
+  
+  // Temperatura y transporte
+  temperaturaTransporte TemperaturaTransporte @default(CONGELADA)
+  
+  // Tipo de consumo
+  tipoConsumo           TipoConsumo     @default(HUMANO)
+  empresa               TipoEmpresa     @default(PROPIA)
+  
+  // Jaslo
+  jaslo                 Boolean         @default(false)
+  
+  // Formato etiqueta
+  formatoEtiqueta       String?         // FORMATO ETIQ.
+  
+  // Textos en etiqueta
+  textoTipoTrabajo      String?         // TEXTO DE TIPO DE TRABAJO
+  textoTipoCarne        String?         // TEXTO DE TIPO DE CARNE
+  textoEspanol          String?         // TEXTO EN ESPAÑOL
+  textoIngles           String?         // TEXTO EN INGLÉS
+  textoTercerIdioma     String?         // TEXTO EN TERCER IDIOMA
+  
+  // Especie (para productos específicos)
+  especie               Especie?
   
   // Configuración del código EAN-128 (parte fija)
   codigoTipificacion    String?         // 2 dígitos
@@ -106,10 +161,8 @@ model Producto {
   codigoTransporte      String?         // 1 dígito
   codigoDestino         String?         // 2 dígitos
   
-  // Datos del producto
-  tara                  Float?
+  // Datos adicionales del modelo anterior
   diasConservacion      Int?
-  requiereTipificacion  Boolean         @default(false)
   tipoRotulo            TipoRotulo?
   precio                Float?
   temperaturaConservacion String?
@@ -125,8 +178,39 @@ model Producto {
 
   precios               PrecioProducto[]
 
-  @@unique([codigo, especie])
+  @@unique([codigo])
   @@index([especie])
+  @@index([tipoTrabajo])
+  @@index([activo])
+}
+
+enum TipoTrabajoProducto {
+  LAMA
+  MR
+  NINGUNO
+}
+
+enum IdiomaEtiqueta {
+  ESPAÑOL
+  INGLES
+  ITALIANO
+  OTRO
+}
+
+enum TemperaturaTransporte {
+  CONGELADA
+  ENFRIADA_BUQUE
+  ENFRIADA_AVION
+}
+
+enum TipoConsumo {
+  HUMANO
+  NO_HUMANO
+}
+
+enum TipoEmpresa {
+  PROPIA
+  OTRA
 }
 
 enum TipoRotulo {

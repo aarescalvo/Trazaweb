@@ -20,6 +20,7 @@ import { RomaneoModule } from '@/components/romaneo'
 import { MenudenciasTropaModule } from '@/components/menudencias-tropa'
 import { StockCamarasModule } from '@/components/stock-camaras'
 import { FacturacionModule } from '@/components/facturacion'
+import ProductosModule from '@/components/productos'
 import { ConnectionIndicator, OfflineBanner } from '@/lib/offline/components'
 
 // Lucide icons
@@ -74,7 +75,7 @@ interface Stats {
   enCamara: number
 }
 
-type Page = 'dashboard' | 'pesajeCamiones' | 'movimientoHacienda' | 'pesajeIndividual' | 'listaFaena' | 'ingresoFaena' | 'cierreFaena' | 'romaneo' | 'menudencias' | 'stock' | 'facturacion' | 'reportes' | 'configuracion'
+type Page = 'dashboard' | 'pesajeCamiones' | 'movimientoHacienda' | 'pesajeIndividual' | 'listaFaena' | 'ingresoFaena' | 'cierreFaena' | 'romaneo' | 'menudencias' | 'stock' | 'facturacion' | 'productos' | 'reportes' | 'configuracion'
 
 const NAV_ITEMS = [
   { id: 'dashboard' as Page, label: 'Dashboard', icon: Beef },
@@ -88,6 +89,7 @@ const NAV_ITEMS = [
   { id: 'menudencias' as Page, label: 'Menudencias por Tropa', icon: Package, permiso: 'puedeMenudencias' },
   { id: 'stock' as Page, label: 'Stock Cámaras', icon: Warehouse, permiso: 'puedeStock' },
   { id: 'facturacion' as Page, label: 'Facturación', icon: DollarSign, permiso: 'puedeFacturacion' },
+  { id: 'productos' as Page, label: 'Productos', icon: Tag, permiso: 'puedeConfiguracion' },
   { id: 'reportes' as Page, label: 'Reportes', icon: FileText, permiso: 'puedeReportes' },
   { id: 'configuracion' as Page, label: 'Configuración', icon: Settings, permiso: 'puedeConfiguracion' },
 ]
@@ -496,6 +498,8 @@ export default function FrigorificoApp() {
         return <StockCamarasModule operador={operador} />
       case 'facturacion':
         return <FacturacionModule operador={operador} />
+      case 'productos':
+        return <ProductosModule />
       case 'reportes':
         return <PlaceholderContent title="Reportes" description="Informes y estadísticas" icon={FileText} />
       case 'configuracion':
