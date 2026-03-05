@@ -11,9 +11,9 @@ export async function GET(request: NextRequest) {
         estado: { notIn: ['FAENADO', 'DESPACHADO'] }
       },
       include: {
-        corral: true,
+        Corral: true,
         _count: {
-          select: { animales: true }
+          select: { Animal: true }
         }
       }
     })
@@ -22,18 +22,18 @@ export async function GET(request: NextRequest) {
     const corralesMap = new Map<string, { corralId: string; corralNombre: string; totalCabezas: number; tropas: { codigo: string; cantidad: number }[] }>()
 
     for (const tropa of tropas) {
-      if (!tropa.corralId || !tropa.corral) continue
+      if (!tropa.corralId || !tropa.Corral) continue
 
       const corralId = tropa.corralId
       const existing = corralesMap.get(corralId) || {
         corralId,
-        corralNombre: tropa.corral.nombre,
+        corralNombre: tropa.Corral.nombre,
         totalCabezas: 0,
         tropas: []
       }
 
       // Use animal count if available, otherwise use cantidadCabezas
-      const cantidad = tropa._count.animales || tropa.cantidadCabezas
+      const cantidad = tropa._count.Animal || tropa.cantidadCabezas
 
       existing.totalCabezas += cantidad
       existing.tropas.push({ codigo: tropa.codigo, cantidad })

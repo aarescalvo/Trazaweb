@@ -21,11 +21,11 @@ export async function GET(request: NextRequest) {
     const tropas = await db.tropa.findMany({
       where,
       include: {
-        productor: true,
-        usuarioFaena: true,
-        corral: true,
-        tiposAnimales: true,
-        animales: {
+        Cliente_Tropa_productorIdToCliente: true,
+        Cliente_Tropa_usuarioFaenaIdToCliente: true,
+        Corral: true,
+        TropaAnimalCantidad: true,
+        Animal: {
           orderBy: { numero: 'asc' }
         }
       },
@@ -41,12 +41,12 @@ export async function GET(request: NextRequest) {
         numero: t.numero,
         codigo: t.codigo,
         codigoSimplificado: t.codigoSimplificado,
-        productor: t.productor,
-        usuarioFaena: t.usuarioFaena,
+        productor: t.Cliente_Tropa_productorIdToCliente,
+        usuarioFaena: t.Cliente_Tropa_usuarioFaenaIdToCliente,
         especie: t.especie,
         cantidadCabezas: t.cantidadCabezas,
         corralId: t.corralId,
-        corral: t.corral,
+        corral: t.Corral,
         estado: t.estado,
         fechaRecepcion: t.fechaRecepcion.toISOString(),
         pesoBruto: t.pesoBruto,
@@ -56,8 +56,8 @@ export async function GET(request: NextRequest) {
         dte: t.dte,
         guia: t.guia,
         observaciones: t.observaciones,
-        tiposAnimales: t.tiposAnimales,
-        animales: t.animales?.map(a => ({
+        tiposAnimales: t.TropaAnimalCantidad,
+        animales: t.Animal?.map(a => ({
           id: a.id,
           numero: a.numero,
           codigo: a.codigo,
@@ -124,10 +124,10 @@ export async function PUT(request: NextRequest) {
       where: { id },
       data: updateData,
       include: {
-        productor: true,
-        usuarioFaena: true,
-        corral: true,
-        tiposAnimales: true
+        Cliente_Tropa_productorIdToCliente: true,
+        Cliente_Tropa_usuarioFaenaIdToCliente: true,
+        Corral: true,
+        TropaAnimalCantidad: true
       }
     })
 
@@ -137,14 +137,14 @@ export async function PUT(request: NextRequest) {
         id: tropa.id,
         numero: tropa.numero,
         codigo: tropa.codigo,
-        productor: tropa.productor,
-        usuarioFaena: tropa.usuarioFaena,
+        productor: tropa.Cliente_Tropa_productorIdToCliente,
+        usuarioFaena: tropa.Cliente_Tropa_usuarioFaenaIdToCliente,
         especie: tropa.especie,
         cantidadCabezas: tropa.cantidadCabezas,
         corralId: tropa.corralId,
-        corral: tropa.corral,
+        corral: tropa.Corral,
         estado: tropa.estado,
-        tiposAnimales: tropa.tiposAnimales
+        tiposAnimales: tropa.TropaAnimalCantidad
       }
     })
   } catch (error) {

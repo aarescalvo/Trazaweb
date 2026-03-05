@@ -45,16 +45,16 @@ export async function GET(request: NextRequest) {
   try {
     const pesajes = await db.pesajeCamion.findMany({
       include: {
-        transportista: true,
-        tropa: {
+        Transportista: true,
+        Tropa: {
           include: {
-            productor: true,
-            usuarioFaena: true,
-            tiposAnimales: true,
-            corral: true
+            Cliente_Tropa_productorIdToCliente: true,
+            Cliente_Tropa_usuarioFaenaIdToCliente: true,
+            TropaAnimalCantidad: true,
+            Corral: true
           }
         },
-        operador: true
+        Operador: true
       },
       orderBy: {
         fecha: 'desc'
@@ -76,7 +76,7 @@ export async function GET(request: NextRequest) {
       patenteAcoplado: p.patenteAcoplado,
       chofer: p.choferNombre,
       dniChofer: p.choferDni,
-      transportista: p.transportista,
+      transportista: p.Transportista,
       destino: p.destino,
       remito: p.remito,
       pesoBruto: p.pesoBruto,
@@ -84,19 +84,19 @@ export async function GET(request: NextRequest) {
       pesoNeto: p.pesoNeto,
       descripcion: p.observaciones,
       estado: p.estado,
-      operador: p.operador,
-      tropa: p.tropa ? {
-        id: p.tropa.id,
-        codigo: p.tropa.codigo,
-        productor: p.tropa.productor,
-        usuarioFaena: p.tropa.usuarioFaena,
-        especie: p.tropa.especie,
-        cantidadCabezas: p.tropa.cantidadCabezas,
-        corral: p.tropa.corral?.nombre || null,
-        dte: p.tropa.dte,
-        guia: p.tropa.guia,
-        tiposAnimales: p.tropa.tiposAnimales,
-        observaciones: p.tropa.observaciones
+      operador: p.Operador,
+      tropa: p.Tropa ? {
+        id: p.Tropa.id,
+        codigo: p.Tropa.codigo,
+        productor: p.Tropa.Cliente_Tropa_productorIdToCliente,
+        usuarioFaena: p.Tropa.Cliente_Tropa_usuarioFaenaIdToCliente,
+        especie: p.Tropa.especie,
+        cantidadCabezas: p.Tropa.cantidadCabezas,
+        corral: p.Tropa.Corral?.nombre || null,
+        dte: p.Tropa.dte,
+        guia: p.Tropa.guia,
+        tiposAnimales: p.Tropa.TropaAnimalCantidad,
+        observaciones: p.Tropa.observaciones
       } : null
     }))
     
@@ -221,8 +221,8 @@ export async function POST(request: NextRequest) {
     const pesaje = await db.pesajeCamion.create({
       data: pesajeData,
       include: {
-        transportista: true,
-        operador: true
+        Transportista: true,
+        Operador: true
       }
     })
     
@@ -309,10 +309,10 @@ export async function POST(request: NextRequest) {
       const tropa = await db.tropa.create({
         data: tropaData,
         include: {
-          productor: true,
-          usuarioFaena: true,
-          tiposAnimales: true,
-          corral: true
+          Cliente_Tropa_productorIdToCliente: true,
+          Cliente_Tropa_usuarioFaenaIdToCliente: true,
+          TropaAnimalCantidad: true,
+          Corral: true
         }
       })
       
@@ -345,10 +345,10 @@ export async function POST(request: NextRequest) {
       const tropaCompleta = await db.tropa.findUnique({
         where: { id: tropa.id },
         include: {
-          productor: true,
-          usuarioFaena: true,
-          tiposAnimales: true,
-          corral: true
+          Cliente_Tropa_productorIdToCliente: true,
+          Cliente_Tropa_usuarioFaenaIdToCliente: true,
+          TropaAnimalCantidad: true,
+          Corral: true
         }
       })
       
@@ -364,14 +364,14 @@ export async function POST(request: NextRequest) {
           tropa: tropaCompleta ? {
             id: tropaCompleta.id,
             codigo: tropaCompleta.codigo,
-            productor: tropaCompleta.productor,
-            usuarioFaena: tropaCompleta.usuarioFaena,
+            productor: tropaCompleta.Cliente_Tropa_productorIdToCliente,
+            usuarioFaena: tropaCompleta.Cliente_Tropa_usuarioFaenaIdToCliente,
             especie: tropaCompleta.especie,
             cantidadCabezas: tropaCompleta.cantidadCabezas,
-            corral: tropaCompleta.corral?.nombre || null,
+            corral: tropaCompleta.Corral?.nombre || null,
             dte: tropaCompleta.dte,
             guia: tropaCompleta.guia,
-            tiposAnimales: tropaCompleta.tiposAnimales,
+            tiposAnimales: tropaCompleta.TropaAnimalCantidad,
             observaciones: tropaCompleta.observaciones
           } : null
         }
@@ -413,23 +413,23 @@ export async function PUT(request: NextRequest) {
         fechaTara: new Date()
       },
       include: {
-        transportista: true,
-        operador: true,
-        tropa: {
+        Transportista: true,
+        Operador: true,
+        Tropa: {
           include: {
-            productor: true,
-            usuarioFaena: true,
-            tiposAnimales: true,
-            corral: true
+            Cliente_Tropa_productorIdToCliente: true,
+            Cliente_Tropa_usuarioFaenaIdToCliente: true,
+            TropaAnimalCantidad: true,
+            Corral: true
           }
         }
       }
     })
     
     // Actualizar tropa si existe
-    if (pesaje.tropa) {
+    if (pesaje.Tropa) {
       await db.tropa.update({
-        where: { id: pesaje.tropa.id },
+        where: { id: pesaje.Tropa.id },
         data: {
           pesoTara: parseFloat(pesoTara),
           pesoNeto: parseFloat(pesoNeto),
@@ -445,16 +445,16 @@ export async function PUT(request: NextRequest) {
         chofer: pesaje.choferNombre,
         dniChofer: pesaje.choferDni,
         descripcion: pesaje.observaciones,
-        tropa: pesaje.tropa ? {
-          id: pesaje.tropa.id,
-          codigo: pesaje.tropa.codigo,
-          productor: pesaje.tropa.productor,
-          usuarioFaena: pesaje.tropa.usuarioFaena,
-          especie: pesaje.tropa.especie,
-          cantidadCabezas: pesaje.tropa.cantidadCabezas,
-          corral: pesaje.tropa.corral?.nombre || null,
-          tiposAnimales: pesaje.tropa.tiposAnimales,
-          observaciones: pesaje.tropa.observaciones
+        tropa: pesaje.Tropa ? {
+          id: pesaje.Tropa.id,
+          codigo: pesaje.Tropa.codigo,
+          productor: pesaje.Tropa.Cliente_Tropa_productorIdToCliente,
+          usuarioFaena: pesaje.Tropa.Cliente_Tropa_usuarioFaenaIdToCliente,
+          especie: pesaje.Tropa.especie,
+          cantidadCabezas: pesaje.Tropa.cantidadCabezas,
+          corral: pesaje.Tropa.Corral?.nombre || null,
+          tiposAnimales: pesaje.Tropa.TropaAnimalCantidad,
+          observaciones: pesaje.Tropa.observaciones
         } : null
       }
     })

@@ -23,14 +23,14 @@ export async function POST(request: NextRequest) {
         fechaCierre: new Date()
       },
       include: {
-        tropas: {
-          include: { tropa: true }
+        ListaFaenaTropa: {
+          include: { Tropa: true }
         }
       }
     })
 
     // Update tropas status
-    for (const lt of lista.tropas) {
+    for (const lt of lista.ListaFaenaTropa) {
       await db.tropa.update({
         where: { id: lt.tropaId },
         data: { estado: 'EN_FAENA' }

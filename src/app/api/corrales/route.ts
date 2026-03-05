@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
     const corrales = await db.corral.findMany({
       orderBy: { nombre: 'asc' },
       include: {
-        tropas: {
+        Tropa: {
           where: {
             estado: { in: ['RECIBIDO', 'EN_CORRAL', 'EN_PESAJE', 'PESADO', 'LISTO_FAENA'] }
           },
@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
     
     // Calcular stock actual por corral
     const corralesConStock = corrales.map(corral => {
-      const tropasActivas = corral.tropas
+      const tropasActivas = corral.Tropa
       const stockBovinos = tropasActivas
         .filter(t => t.especie === 'BOVINO')
         .reduce((acc, t) => acc + t.cantidadCabezas, 0)
