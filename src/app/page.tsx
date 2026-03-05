@@ -247,9 +247,9 @@ export default function FrigorificoApp() {
   if (!operador) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-stone-800 to-stone-900 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md border-0 shadow-2xl">
+        <Card className="w-full max-w-lg border-0 shadow-2xl">
           <CardHeader className="text-center pb-2">
-            <div className="relative w-20 h-20 mx-auto mb-4">
+            <div className="relative w-64 h-64 mx-auto mb-4">
               <Image 
                 src="/logo.png" 
                 alt="Solemar Alimentaria" 
@@ -533,21 +533,21 @@ export default function FrigorificoApp() {
         {/* Sidebar */}
         <aside className="fixed inset-y-0 left-0 z-40 w-64 bg-white border-r flex flex-col shadow-lg">
           {/* Logo */}
-          <div className="h-20 flex items-center gap-3 px-4 border-b bg-gradient-to-r from-amber-50 to-white">
-            <div className="relative w-12 h-12 flex-shrink-0">
-            <Image 
-              src="/logo.png" 
-              alt="Solemar Alimentaria" 
-              fill
-              className="object-contain"
-              priority
-            />
+          <div className="h-28 flex items-center gap-4 px-4 border-b bg-gradient-to-r from-amber-50 to-white">
+            <div className="relative w-20 h-20 flex-shrink-0">
+              <Image 
+                src="/logo.png" 
+                alt="Solemar Alimentaria" 
+                fill
+                className="object-contain"
+                priority
+              />
+            </div>
+            <div className="flex flex-col">
+              <h1 className="font-bold text-stone-800 text-lg leading-tight">Solemar Alimentaria</h1>
+              <p className="text-sm text-amber-600 font-semibold">CICLO I</p>
+            </div>
           </div>
-          <div className="flex flex-col">
-            <h1 className="font-bold text-stone-800 text-sm leading-tight">Solemar Alimentaria</h1>
-            <p className="text-xs text-amber-600 font-medium">CICLO I</p>
-          </div>
-        </div>
         
         {/* Operator info */}
         <div className="p-3 border-b bg-stone-50">
